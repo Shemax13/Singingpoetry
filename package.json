@@ -1,0 +1,15 @@
+{
+  "name": "shemaxpoetry",
+  "version": "1.0.0",
+  "private": true,
+  "scripts": {
+    "dev": "wrangler pages dev public --d1 SHEMAX_DB --binding TELEGRAM_BOT_TOKEN=test ADMIN_PASSWORD=test SUNO_COOKIE= --port 8788",
+    "deploy": "wrangler pages deploy public --d1 SHEMAX_DB",
+    "migrate": "wrangler d1 migrations apply SHEMAX_DB",
+    "create-db": "wrangler d1 create SHEMAX_DB",
+    "setup-webhook": "wrangler pages deploy public --d1 SHEMAX_DB && wrangler d1 execute SHEMAX_DB --command \"SELECT value FROM settings WHERE key='webhook_url'\""
+  },
+  "devDependencies": {
+    "@cloudflare/workers-types": "^4.20260616.1"
+  }
+}

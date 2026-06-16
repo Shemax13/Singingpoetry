@@ -1,0 +1,138 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Shemaxpoetry</title>
+<link rel="stylesheet" href="/css/style.css">
+<link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>♪</text></svg>">
+</head>
+<body>
+  <nav class="nav">
+    <a href="/" class="nav-brand">Shemax<span>poetry</span></a>
+    <div class="nav-links">
+      <a href="/" data-i18n="navHome">Главная</a>
+      <a href="#songs" data-i18n="navSongs">Песни</a>
+      <a href="#about" data-i18n="navAbout">О проекте</a>
+      <button class="lang-toggle" onclick="toggleLang()">EN</button>
+    </div>
+  </nav>
+
+  <main>
+    <section class="hero">
+      <h1 class="hero-title"><span data-i18n="heroTitle">Поэзия в звуке</span></h1>
+      <p class="hero-subtitle" data-i18n="heroSubtitle">Авторские песни и стихи</p>
+      <a href="#songs" class="hero-cta" data-i18n="heroCta">Слушать</a>
+    </section>
+
+    <section class="section" id="songs">
+      <div class="section-header">
+        <h2 class="section-title" data-i18n="songsTitle">Песни</h2>
+        <p class="section-subtitle" data-i18n="songsSubtitle">Авторская поэзия в музыкальном воплощении</p>
+      </div>
+      <div class="song-grid" id="songGrid"></div>
+    </section>
+
+    <section class="section hidden" id="playerPage">
+      <div class="player-page">
+        <div class="mode-switch">
+          <button data-mode="video" class="active" onclick="switchMode('video')" data-i18n="playerVideo">Видео</button>
+          <button data-mode="audio" onclick="switchMode('audio')" data-i18n="playerAudio">Аудио</button>
+        </div>
+
+        <div id="playerPageModeVideo">
+          <div class="player-page-video">
+            <video id="playerVideo" controls playsinline></video>
+          </div>
+        </div>
+
+        <div id="playerPageModeAudio" class="hidden">
+          <div class="player-page-cover" id="playerPageCover">
+            <div class="placeholder">♪</div>
+          </div>
+          <div class="player-page-info">
+            <h2 class="player-page-title" id="playerPageTitle"></h2>
+          </div>
+          <div class="player-page-controls">
+            <button onclick="prevSong()">⏮</button>
+            <button class="pp-play-btn" onclick="togglePlay()">▶</button>
+            <button onclick="nextSong()">⏭</button>
+          </div>
+          <div class="lyrics" id="playerPageLyrics"></div>
+        </div>
+
+        <audio id="playerAudio" class="hidden" preload="auto"></audio>
+
+        <div class="queue" id="playerQueue"></div>
+      </div>
+    </section>
+
+    <section class="section" id="about">
+      <div class="section-header">
+        <h2 class="section-title" data-i18n="aboutTitle">О проекте</h2>
+        <p class="about-text" id="aboutText">Поэтический проект Shemaxpoetry</p>
+      </div>
+    </section>
+  </main>
+
+  <div class="player-bar" id="playerBar">
+    <div class="player-info">
+      <div class="player-cover" id="playerBarCover">
+        <div class="placeholder">♪</div>
+      </div>
+      <div class="player-text">
+        <div class="player-title" id="playerBarTitle"></div>
+      </div>
+    </div>
+    <div class="player-progress">
+      <span class="player-time" id="playerTime">0:00 / 0:00</span>
+      <input type="range" id="playerProgress" value="0" max="100" oninput="seekTo(event)">
+    </div>
+    <div class="player-controls">
+      <button onclick="prevSong()">⏮</button>
+      <button class="play-btn" onclick="togglePlay()">▶</button>
+      <button onclick="nextSong()">⏭</button>
+      <button class="player-mode-toggle" id="playerModeToggle" onclick="switchMode(playerMode === 'video' ? 'audio' : 'video')" data-i18n="switchToAudio">Аудиорежим</button>
+    </div>
+  </div>
+
+  <footer class="footer">
+    <p>Shemaxpoetry &copy; <span id="year"></span></p>
+  </footer>
+
+  <script src="/js/i18n.js"></script>
+  <script src="/js/app.js"></script>
+  <script>
+    document.getElementById('year').textContent = new Date().getFullYear();
+
+    // Fetch about text from API
+    fetch('/api/settings')
+      .then(r => r.json())
+      .then(result => {
+        if (result.ok && result.data) {
+          const lang = localStorage.getItem('shemax-lang') || 'ru';
+          const key = lang === 'en' ? 'about_text_en' : 'about_text_ru';
+          const aboutEl = document.getElementById('aboutText');
+          if (aboutEl && result.data[key]) aboutEl.textContent = result.data[key];
+        }
+      })
+      .catch(() => {});
+
+    // Update about text on language change
+    const origToggle = toggleLang;
+    toggleLang = function() {
+      origToggle();
+      fetch('/api/settings')
+        .then(r => r.json())
+        .then(result => {
+          if (result.ok && result.data) {
+            const key = currentLang === 'en' ? 'about_text_en' : 'about_text_ru';
+            const aboutEl = document.getElementById('aboutText');
+            if (aboutEl && result.data[key]) aboutEl.textContent = result.data[key];
+          }
+        })
+        .catch(() => {});
+    };
+  </script>
+</body>
+</html>

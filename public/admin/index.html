@@ -1,0 +1,546 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Shemaxpoetry — Admin</title>
+<link rel="stylesheet" href="/css/style.css">
+<style>
+  :root {
+    --admin-bg: #0d0d14;
+    --admin-card: #151521;
+    --admin-border: rgba(255,255,255,0.06);
+    --admin-accent: #d4a853;
+  }
+
+  .admin-layout {
+    max-width: 1200px;
+    margin: 0 auto;
+    padding: 88px 24px 40px;
+  }
+
+  .admin-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 32px;
+  }
+
+  .admin-header h1 {
+    font-family: var(--font-serif);
+    font-size: 1.5rem;
+    font-weight: 400;
+  }
+
+  .admin-header h1 span { color: var(--accent); }
+
+  .auth-box {
+    max-width: 400px;
+    margin: 120px auto;
+    padding: 40px;
+    background: var(--admin-card);
+    border: 1px solid var(--admin-border);
+    border-radius: var(--radius-lg);
+    text-align: center;
+  }
+
+  .auth-box h2 {
+    font-family: var(--font-serif);
+    font-weight: 400;
+    margin-bottom: 24px;
+  }
+
+  .auth-box input {
+    width: 100%;
+    padding: 12px 16px;
+    background: var(--bg-primary);
+    border: 1px solid var(--admin-border);
+    border-radius: var(--radius);
+    color: var(--text-primary);
+    font-size: 1rem;
+    margin-bottom: 16px;
+    outline: none;
+    transition: var(--transition);
+  }
+
+  .auth-box input:focus {
+    border-color: var(--accent);
+  }
+
+  .auth-box .error {
+    color: #ef4444;
+    font-size: 0.85rem;
+    margin-bottom: 12px;
+  }
+
+  .btn {
+    padding: 10px 24px;
+    border-radius: var(--radius);
+    border: none;
+    cursor: pointer;
+    font-size: 0.9rem;
+    transition: var(--transition);
+    background: var(--accent);
+    color: var(--bg-primary);
+    font-weight: 500;
+  }
+
+  .btn:hover { background: var(--accent-hover); }
+  .btn:disabled { opacity: 0.5; cursor: not-allowed; }
+  .btn-secondary {
+    background: transparent;
+    border: 1px solid var(--admin-border);
+    color: var(--text-secondary);
+  }
+  .btn-secondary:hover {
+    border-color: var(--accent);
+    color: var(--accent);
+  }
+  .btn-danger { background: transparent; color: #ef4444; border: 1px solid rgba(239,68,68,0.3); }
+  .btn-danger:hover { background: rgba(239,68,68,0.1); border-color: #ef4444; }
+  .btn-sm {
+    padding: 6px 12px;
+    font-size: 0.8rem;
+    border-radius: 6px;
+  }
+
+  .admin-card {
+    background: var(--admin-card);
+    border: 1px solid var(--admin-border);
+    border-radius: var(--radius-lg);
+    padding: 24px;
+    margin-bottom: 24px;
+  }
+
+  .admin-card h3 {
+    font-family: var(--font-serif);
+    font-weight: 400;
+    margin-bottom: 16px;
+    font-size: 1.1rem;
+  }
+
+  .stats-grid {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 16px;
+  }
+
+  .stat-item {
+    text-align: center;
+    padding: 16px;
+    background: var(--bg-primary);
+    border-radius: var(--radius);
+  }
+
+  .stat-value {
+    font-size: 1.8rem;
+    font-family: var(--font-serif);
+    color: var(--accent);
+  }
+
+  .stat-label {
+    font-size: 0.8rem;
+    color: var(--text-muted);
+    margin-top: 4px;
+  }
+
+  .admin-table {
+    width: 100%;
+    border-collapse: collapse;
+  }
+
+  .admin-table th {
+    text-align: left;
+    padding: 12px 8px;
+    font-size: 0.8rem;
+    color: var(--text-muted);
+    border-bottom: 1px solid var(--admin-border);
+    font-weight: 500;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+  }
+
+  .admin-table td {
+    padding: 12px 8px;
+    border-bottom: 1px solid var(--admin-border);
+    font-size: 0.9rem;
+  }
+
+  .admin-table tr.dragging {
+    opacity: 0.3;
+  }
+
+  .admin-table tr.drag-over {
+    border-top: 2px solid var(--accent);
+  }
+
+  .drag-handle {
+    cursor: grab;
+    color: var(--text-muted);
+    font-size: 1.2rem;
+    user-select: none;
+  }
+
+  .admin-table tr:not(.dragging):hover {
+    background: rgba(255,255,255,0.02);
+  }
+
+  .badge {
+    display: inline-block;
+    padding: 2px 8px;
+    border-radius: 4px;
+    font-size: 0.7rem;
+    font-weight: 500;
+  }
+
+  .badge-video {
+    background: rgba(59,130,246,0.15);
+    color: #60a5fa;
+  }
+
+  .badge-audio {
+    background: rgba(212,168,83,0.15);
+    color: var(--accent);
+  }
+
+  .toggle {
+    position: relative;
+    display: inline-block;
+    width: 40px;
+    height: 22px;
+    cursor: pointer;
+  }
+
+  .toggle input {
+    opacity: 0;
+    width: 0;
+    height: 0;
+  }
+
+  .toggle-slider {
+    position: absolute;
+    inset: 0;
+    background: var(--bg-primary);
+    border: 1px solid var(--admin-border);
+    border-radius: 22px;
+    transition: var(--transition);
+  }
+
+  .toggle-slider::before {
+    content: '';
+    position: absolute;
+    width: 16px;
+    height: 16px;
+    left: 2px;
+    bottom: 2px;
+    background: var(--text-muted);
+    border-radius: 50%;
+    transition: var(--transition);
+  }
+
+  .toggle input:checked + .toggle-slider {
+    background: var(--accent-dim);
+    border-color: var(--accent);
+  }
+
+  .toggle input:checked + .toggle-slider::before {
+    transform: translateX(18px);
+    background: var(--accent);
+  }
+
+  .modal-overlay {
+    position: fixed;
+    inset: 0;
+    background: rgba(0,0,0,0.6);
+    z-index: 200;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 24px;
+  }
+
+  .modal-content {
+    background: var(--admin-card);
+    border: 1px solid var(--admin-border);
+    border-radius: var(--radius-lg);
+    padding: 32px;
+    width: 100%;
+    max-width: 600px;
+    max-height: 90vh;
+    overflow-y: auto;
+  }
+
+  .modal-content h3 {
+    font-family: var(--font-serif);
+    font-weight: 400;
+    margin-bottom: 20px;
+  }
+
+  .form-group {
+    margin-bottom: 16px;
+  }
+
+  .form-group label {
+    display: block;
+    font-size: 0.85rem;
+    color: var(--text-secondary);
+    margin-bottom: 6px;
+  }
+
+  .form-group input,
+  .form-group textarea,
+  .form-group select {
+    width: 100%;
+    padding: 10px 14px;
+    background: var(--bg-primary);
+    border: 1px solid var(--admin-border);
+    border-radius: var(--radius);
+    color: var(--text-primary);
+    font-size: 0.9rem;
+    outline: none;
+    transition: var(--transition);
+    font-family: inherit;
+  }
+
+  .form-group textarea {
+    min-height: 100px;
+    resize: vertical;
+  }
+
+  .form-group input:focus,
+  .form-group textarea:focus {
+    border-color: var(--accent);
+  }
+
+  .form-actions {
+    display: flex;
+    gap: 8px;
+    justify-content: flex-end;
+    margin-top: 24px;
+  }
+
+  .suno-input-group {
+    display: flex;
+    gap: 8px;
+    margin-bottom: 12px;
+  }
+
+  .suno-input-group input {
+    flex: 1;
+  }
+
+  .suno-preview {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    padding: 12px;
+    background: var(--bg-primary);
+    border-radius: var(--radius);
+    margin-bottom: 12px;
+  }
+
+  .tabs {
+    display: flex;
+    gap: 4px;
+    margin-bottom: 24px;
+    border-bottom: 1px solid var(--admin-border);
+    padding-bottom: 0;
+  }
+
+  .tabs button {
+    padding: 10px 20px;
+    background: none;
+    border: none;
+    color: var(--text-muted);
+    cursor: pointer;
+    font-size: 0.9rem;
+    border-bottom: 2px solid transparent;
+    transition: var(--transition);
+  }
+
+  .tabs button:hover {
+    color: var(--text-secondary);
+  }
+
+  .tabs button.active {
+    color: var(--accent);
+    border-bottom-color: var(--accent);
+  }
+
+  .tab-content { display: none; }
+  .tab-content.active { display: block; }
+
+  .text-muted { color: var(--text-muted); }
+  .mb-4 { margin-bottom: 16px; }
+
+  .sync-bar {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    padding: 16px;
+    background: var(--bg-primary);
+    border-radius: var(--radius);
+  }
+
+  @media (max-width: 768px) {
+    .stats-grid { grid-template-columns: 1fr; }
+    .admin-header { flex-direction: column; align-items: flex-start; gap: 12px; }
+    .admin-table { font-size: 0.8rem; }
+    .modal-content { padding: 20px; }
+  }
+</style>
+</head>
+<body>
+  <nav class="nav">
+    <a href="/" class="nav-brand">Shemax<span>poetry</span></a>
+    <div class="nav-links">
+      <a href="/">← Site</a>
+    </div>
+  </nav>
+
+  <!-- Auth -->
+  <div id="authSection" class="auth-box">
+    <h2>Admin</h2>
+    <div class="error hidden" id="loginError"></div>
+    <input type="password" id="loginPassword" placeholder="Password">
+    <button class="btn" id="loginBtn" style="width:100%">Sign In</button>
+  </div>
+
+  <!-- Admin Content -->
+  <div id="adminContent" class="admin-layout hidden">
+    <div class="admin-header">
+      <h1>Shemax<span>poetry</span> <span style="font-size:0.7rem;color:var(--text-muted);font-family:var(--font-sans)">Admin</span></h1>
+      <button class="btn btn-secondary btn-sm" onclick="localStorage.removeItem('shemax-admin-token');location.reload()">Sign Out</button>
+    </div>
+
+    <!-- Tabs -->
+    <div class="tabs">
+      <button class="active" onclick="switchTab('songs', this)">Songs</button>
+      <button onclick="switchTab('sync', this)">Sync</button>
+      <button onclick="switchTab('settings', this)">Settings</button>
+    </div>
+
+    <!-- Songs Tab -->
+    <div class="tab-content active" id="tab-songs">
+      <div class="admin-card">
+        <div class="stats-grid">
+          <div class="stat-item">
+            <div class="stat-value" id="statTotal">0</div>
+            <div class="stat-label">Total</div>
+          </div>
+          <div class="stat-item">
+            <div class="stat-value" id="statVisible">0</div>
+            <div class="stat-label">Visible</div>
+          </div>
+          <div class="stat-item">
+            <div class="stat-value" id="statHidden">0</div>
+            <div class="stat-label">Hidden</div>
+          </div>
+        </div>
+      </div>
+
+      <div class="admin-card">
+        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:16px">
+          <h3>All Songs</h3>
+          <button class="btn btn-sm" onclick="editSong(null)">+ Add</button>
+        </div>
+        <table class="admin-table">
+          <thead>
+            <tr>
+              <th style="width:24px"></th>
+              <th style="width:32px">#</th>
+              <th>Title</th>
+              <th style="width:100px">Media</th>
+              <th style="width:60px">Show</th>
+              <th style="width:80px">Actions</th>
+            </tr>
+          </thead>
+          <tbody id="songsTableBody"></tbody>
+        </table>
+      </div>
+    </div>
+
+    <!-- Sync Tab -->
+    <div class="tab-content" id="tab-sync">
+      <div class="admin-card">
+        <h3>Telegram Sync</h3>
+        <div class="sync-bar">
+          <button class="btn" id="syncBtn" onclick="syncTelegram()">Sync Telegram</button>
+          <span class="text-muted" style="font-size:0.85rem">Import new posts from Telegram channel</span>
+        </div>
+      </div>
+
+      <div class="admin-card">
+        <h3>Fetch from Suno</h3>
+        <p class="text-muted mb-4" style="font-size:0.85rem">Paste a Suno track URL to fetch audio, cover, and title</p>
+        <div class="suno-input-group">
+          <input type="text" id="sunoUrl" placeholder="https://suno.com/song/... or suno.com/s/...">
+          <button class="btn" onclick="fetchSuno()">Fetch</button>
+        </div>
+        <div id="sunoResult"></div>
+      </div>
+    </div>
+
+    <!-- Settings Tab -->
+    <div class="tab-content" id="tab-settings">
+      <div class="admin-card">
+        <h3>Site Settings</h3>
+        <div class="form-group">
+          <label>About text (RU)</label>
+          <textarea id="aboutTextRu" rows="3"></textarea>
+        </div>
+        <div class="form-group">
+          <label>About text (EN)</label>
+          <textarea id="aboutTextEn" rows="3"></textarea>
+        </div>
+        <button class="btn" onclick="saveSettings()">Save Settings</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Edit Modal -->
+  <div class="modal-overlay hidden" id="editModal">
+    <div class="modal-content">
+      <h3>Edit Song</h3>
+      <input type="hidden" id="editId">
+      <div class="form-group">
+        <label>Title</label>
+        <input type="text" id="editTitle" placeholder="Song title">
+      </div>
+      <div class="form-group">
+        <label>Lyrics / Text</label>
+        <textarea id="editLyrics" rows="6"></textarea>
+      </div>
+      <div class="form-group">
+        <label>Telegram Video URL</label>
+        <input type="text" id="editTgUrl" placeholder="https://api.telegram.org/file/bot...">
+      </div>
+      <div class="form-group">
+        <label>Suno Track URL</label>
+        <input type="text" id="editSunoUrl" placeholder="https://suno.com/song/...">
+      </div>
+      <div class="form-group">
+        <label>Language</label>
+        <select id="editLanguage">
+          <option value="ru">Russian</option>
+          <option value="en">English</option>
+        </select>
+      </div>
+      <div class="form-actions">
+        <button class="btn btn-secondary" onclick="closeEdit()">Cancel</button>
+        <button class="btn" onclick="saveEdit()">Save</button>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    function switchTab(name, btn) {
+      document.querySelectorAll('.tabs button').forEach(b => b.classList.remove('active'));
+      document.querySelectorAll('.tab-content').forEach(t => t.classList.remove('active'));
+      btn.classList.add('active');
+      document.getElementById('tab-' + name).classList.add('active');
+    }
+  </script>
+  <script src="/js/admin.js"></script>
+</body>
+</html>
