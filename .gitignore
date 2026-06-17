@@ -5,3 +5,7 @@ dist-functions/
 .env
 scripts/deploy*.mjs
 /tmp/
+
+.dev.vars*
+!.dev.vars.example
+!.env.example
