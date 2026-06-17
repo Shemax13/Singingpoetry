@@ -3,3 +3,5 @@ dist-functions/
 .wrangler/
 *.log
 .env
+scripts/deploy*.mjs
+/tmp/

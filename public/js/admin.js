@@ -1,4 +1,4 @@
-const API = '/api';
+const API = 'https://shemax-esm2.shemax.workers.dev/api';
 let token = localStorage.getItem('shemax-admin-token');
 let songs = [];
 
