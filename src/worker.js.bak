@@ -1,0 +1,815 @@
+function db(e){
+  return {
+    async getSongs(v,l,o){
+      l=l||50;o=o||0;
+      var q="SELECT s.*,(SELECT COUNT(*) FROM audio_breakdowns WHERE song_id=s.id) as podcast_count,(SELECT file_url FROM audio_breakdowns WHERE song_id=s.id AND visible=1 ORDER BY id ASC LIMIT 1) as podcast_audio_url FROM songs s";
+      var p=[];
+      if(v)q+=" WHERE s.visible=1";
+      q+=" ORDER BY s.order_index ASC,s.published_at DESC LIMIT ? OFFSET ?";
+      p.push(l,o);
+      return(await e.prepare(q).bind(...p).all()).results||[];
+    },
+    async getSong(id){return await e.prepare("SELECT s.*,(SELECT file_url FROM audio_breakdowns WHERE song_id=s.id AND visible=1 ORDER BY id ASC LIMIT 1) as podcast_audio_url FROM songs s WHERE id=?").bind(id).first()||null;},
+    async getNextSong(id){
+      var c=await this.getSong(id);
+      if(!c)return null;
+      var r=await e.prepare("SELECT s.*,(SELECT file_url FROM audio_breakdowns WHERE song_id=s.id AND visible=1 ORDER BY id ASC LIMIT 1) as podcast_audio_url FROM songs s WHERE visible=1 AND order_index>? ORDER BY order_index ASC LIMIT 1").bind(c.order_index).first();
+      return r||await e.prepare("SELECT s.*,(SELECT file_url FROM audio_breakdowns WHERE song_id=s.id AND visible=1 ORDER BY id ASC LIMIT 1) as podcast_audio_url FROM songs s WHERE visible=1 ORDER BY order_index ASC LIMIT 1").first();
+    },
+    async upsertSong(s){
+      if(s.id){
+        await e.prepare("UPDATE songs SET title=?,lyrics=?,tg_video_url=?,tg_file_id=?,suno_audio_url=?,suno_cover_url=?,suno_track_url=?,cover_url=?,visible=?,language=?,order_index=?,telegram_message_id=?,published_at=?,updated_at=datetime('now') WHERE id=?").bind(s.title,s.lyrics||null,s.tg_video_url||null,s.tg_file_id||null,s.suno_audio_url||null,s.suno_cover_url||null,s.suno_track_url||null,s.cover_url||null,s.visible!=0?1:0,s.language||"ru",s.order_index||0,s.telegram_message_id||null,s.published_at||null,s.id).run();
+        return this.getSong(s.id);
+      }
+      var r=await e.prepare("INSERT INTO songs(title,lyrics,tg_video_url,tg_file_id,suno_audio_url,suno_cover_url,suno_track_url,cover_url,visible,language,order_index,telegram_message_id,published_at) VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?)").bind(s.title,s.lyrics||null,s.tg_video_url||null,s.tg_file_id||null,s.suno_audio_url||null,s.suno_cover_url||null,s.suno_track_url||null,s.cover_url||null,1,s.language||"ru",s.order_index||0,s.telegram_message_id||null,s.published_at||null).run();
+      return this.getSong(r.meta.last_row_id);
+    },
+    async deleteSong(id){await e.prepare("UPDATE songs SET visible=0 WHERE id=?").bind(id).run();},
+    async reorderSongs(ids){
+      var s=e.prepare("UPDATE songs SET order_index=? WHERE id=?");
+      await e.batch(ids.map(function(id,i){return s.bind(i,id);}));
+    },
+    async getByTgMsg(m){return await e.prepare("SELECT * FROM songs WHERE telegram_message_id=?").bind(m).first()||null;},
+    async createSession(t,ex){await e.prepare("INSERT INTO admin_sessions(id,expires_at) VALUES(?,?)").bind(t,ex).run();},
+    // -- Message store --
+    async storeMessage(m){
+      var exists=await e.prepare("SELECT id FROM messages WHERE chat_id=? AND tg_msg_id=?").bind(m.chat_id,m.tg_msg_id).first();
+      if(exists){
+        if(m.cover_file_id)await e.prepare("UPDATE messages SET cover_file_id=? WHERE id=?").bind(m.cover_file_id,exists.id).run();
+        return exists.id;
+      }
+      var r=await e.prepare("INSERT INTO messages(tg_msg_id,chat_id,chat_type,msg_type,text_content,file_id,file_unique_id,file_url,mime_type,file_size,duration,file_name,forward_from_chat_id,forward_from_msg_id,reply_to_msg_id,reply_to_chat_id,published_at,cover_file_id) VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)").bind(m.tg_msg_id,m.chat_id,m.chat_type,m.msg_type,m.text_content||null,m.file_id||null,m.file_unique_id||null,m.file_url||null,m.mime_type||null,m.file_size||null,m.duration||null,m.file_name||null,m.forward_from_chat_id||null,m.forward_from_msg_id||null,m.reply_to_msg_id||null,m.reply_to_chat_id||null,m.published_at||null,m.cover_file_id||null).run();
+      return r.meta.last_row_id;
+    },
+    async getMessages(chatType,l,o){
+      l=l||100;o=o||0;
+      if(chatType)return(await e.prepare("SELECT * FROM messages WHERE chat_type=? ORDER BY published_at DESC LIMIT ? OFFSET ?").bind(chatType,l,o).all()).results||[];
+      return(await e.prepare("SELECT * FROM messages ORDER BY published_at DESC LIMIT ? OFFSET ?").bind(l,o).all()).results||[];
+    },
+    async getMessageByChatAndMsg(chatId,msgId){return await e.prepare("SELECT * FROM messages WHERE chat_id=? AND tg_msg_id=?").bind(chatId,msgId).first()||null;},
+    async getPublications(){
+      var rows=await e.prepare("SELECT * FROM messages WHERE forward_from_chat_id IS NOT NULL AND forward_from_msg_id IS NOT NULL ORDER BY published_at ASC LIMIT 500").all();
+      var unique=[];var seen={};
+      for(var i=0;i<(rows.results||[]).length;i++){
+        var msg=rows.results[i];
+        var chanId=msg.forward_from_msg_id;
+        if(seen[chanId])continue;
+        seen[chanId]=true;
+        unique.push({msg:msg,chanId:chanId});
+      }
+      // Batch fetch all comments
+      var tgIds=unique.map(function(x){return x.msg.tg_msg_id;});
+      var commentsByReply={};
+      if(tgIds.length){
+        var placeholders=tgIds.map(function(){return '?';}).join(',');
+        var allComments=await e.prepare("SELECT * FROM messages WHERE chat_type='group' AND reply_to_msg_id IN ("+placeholders+") ORDER BY published_at ASC").bind(...tgIds).all();
+        for(var ci=0;ci<(allComments.results||[]).length;ci++){
+          var c=allComments.results[ci];
+          if(!commentsByReply[c.reply_to_msg_id])commentsByReply[c.reply_to_msg_id]=[];
+          commentsByReply[c.reply_to_msg_id].push(c);
+        }
+      }
+      // Batch fetch all songs
+      var chanIds=unique.map(function(x){return x.chanId;});
+      var songsByMsgId={};
+      if(chanIds.length){
+        var placeholders=chanIds.map(function(){return '?';}).join(',');
+        var allSongs=await e.prepare("SELECT id,title,suno_audio_url,suno_cover_url,suno_track_url,cover_url,telegram_message_id FROM songs WHERE telegram_message_id IN ("+placeholders+")").bind(...chanIds).all();
+        for(var si=0;si<(allSongs.results||[]).length;si++){
+          var s=allSongs.results[si];
+          songsByMsgId[s.telegram_message_id]=s;
+        }
+      }
+      var results=[];
+      for(var ui=0;ui<unique.length;ui++){
+        var msg=unique[ui].msg;
+        var chanId=unique[ui].chanId;
+        var post={channel_msg_id:chanId,group_msg_id:msg.tg_msg_id,text_content:msg.text_content,msg_type:msg.msg_type,file_id:msg.file_id,file_unique_id:msg.file_unique_id,file_url:msg.file_url,mime_type:msg.mime_type,file_size:msg.file_size,duration:msg.duration,published_at:msg.published_at,cover_url:msg.cover_url||null};
+        results.push({post:post,comments:commentsByReply[msg.tg_msg_id]||[],song:songsByMsgId[chanId]||null});
+      }
+      return results;
+    },
+    async getMessageStats(){
+      var total=await e.prepare("SELECT COUNT(*) as c FROM messages").first();
+      var fromChannel=await e.prepare("SELECT COUNT(DISTINCT forward_from_msg_id) as c FROM messages WHERE forward_from_chat_id IS NOT NULL").first();
+      var groups=await e.prepare("SELECT COUNT(*) as c FROM messages WHERE chat_type='group'").first();
+      var withMedia=await e.prepare("SELECT COUNT(*) as c FROM messages WHERE file_id IS NOT NULL").first();
+      return{total:total.c,channelPosts:fromChannel.c,groupMsgs:groups.c,withMedia:withMedia.c};
+    },
+    async getChannelMsgCount(){
+      var r=await e.prepare("SELECT COUNT(DISTINCT forward_from_msg_id) as c FROM messages WHERE forward_from_chat_id IS NOT NULL").first();
+      return r?r.c:0;
+    },
+  };
+}
+
+function tg(token){
+  var base="https://api.telegram.org/bot"+token;
+  return{
+    async getFile(fid){var r=await(await fetch(base+"/getFile",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({file_id:fid})})).json();if(!r.ok)throw new Error("TG");return r.result;},
+    getFileUrl(p){return "https://api.telegram.org/file/bot"+token+"/"+p;},
+  };
+}
+
+var cors={"Access-Control-Allow-Origin":"*","Access-Control-Allow-Methods":"GET,POST,PUT,DELETE,OPTIONS","Access-Control-Allow-Headers":"Content-Type,Authorization","Access-Control-Max-Age":"86400"};
+function json(d,s){return new Response(JSON.stringify(d),{status:s||200,headers:Object.assign({},cors,{"Content-Type":"application/json"})});}
+function err(s,c){return json({ok:false,error:s},c||500);}
+function genToken(){var b=new Uint8Array(32);crypto.getRandomValues(b);return Array.from(b).map(function(x){return x.toString(16).padStart(2,"0");}).join("");}
+function safeInt(v,d){var n=parseInt(v);return isNaN(n)?d:n;}
+async function isAuth(req,DB){var h=req.headers.get("Authorization");if(!h||!h.startsWith("Bearer "))return false;return!!await DB.prepare("SELECT id FROM admin_sessions WHERE id=? AND expires_at>datetime('now')").bind(h.slice(7)).first();}
+function firstLine(caption){var s=caption.split("\n")[0];return s?s.trim():"Untitled";}
+
+// -- Suno helpers --
+function sunoExtractUrls(text){
+  if(!text)return[];
+  var urls=[];
+  var re=/(?:https?:\/\/)?(?:www\.)?suno\.com\/(?:s|song)\/([a-zA-Z0-9]+(?:-[a-f0-9-]+)?)/gi;
+  var m;
+  while((m=re.exec(text))!==null){
+    var id=m[1];
+    var url=id.includes("-")?"https://suno.com/song/"+id:"https://suno.com/s/"+id;
+    if(urls.indexOf(url)===-1)urls.push(url);
+  }
+  return urls;
+}
+async function sunoFetch(url){
+  var resp=await fetch("https://opensuno.vercel.app/track?url="+encodeURIComponent(url));
+  if(resp.status===429)throw new Error("Rate limited by opensuno (20/min)");
+  var data=await resp.json();
+  if(data.status!=="ok"||!data.data)throw new Error(data.message||"opensuno fetch failed");
+  return{
+    title:data.data.title||"Untitled",
+    audioUrl:data.data.mp3_url||null,
+    coverUrl:data.data.cover_url||null,
+    duration:data.data.duration||null,
+    trackUrl:url,
+  };
+}
+async function processSunoUrl(url){
+  try{
+    var info=await sunoFetch(url);
+    if(!info.audioUrl)return null;
+    return info;
+  }catch(e){return null;}
+}
+
+function parseMsgFull(update){
+  var m=update.message||update.channel_post||update;
+  if(!m||!m.message_id)return null;
+  var chat=m.chat;
+  var chatId=chat.username?"@"+chat.username:""+chat.id;
+  var chatType=chat.type;
+  var text=m.text||m.caption||"";
+  var published=new Date((m.date||0)*1000).toISOString();
+  var result={
+    tg_msg_id:m.message_id,
+    chat_id:chatId,
+    chat_type:chatType,
+    msg_type:"text",
+    text_content:text||null,
+    file_id:null,
+    file_unique_id:null,
+    file_url:null,
+    mime_type:null,
+    file_size:null,
+    duration:null,
+    file_name:null,
+    forward_from_chat_id:null,
+    forward_from_msg_id:null,
+    reply_to_msg_id:null,
+    reply_to_chat_id:null,
+    published_at:published,
+  };
+  if(m.forward_from_chat&&m.forward_from_message_id){
+    result.forward_from_chat_id=m.forward_from_chat.username?"@"+m.forward_from_chat.username:""+m.forward_from_chat.id;
+    result.forward_from_msg_id=m.forward_from_message_id;
+    if(m.forward_from_chat.type==="channel")result.forward_from_chat_id=m.forward_from_chat.username?"@"+m.forward_from_chat.username:""+m.forward_from_chat.id;
+  }
+  if(m.reply_to_message){
+    result.reply_to_msg_id=m.reply_to_message.message_id;
+    if(m.reply_to_message.chat)result.reply_to_chat_id=m.reply_to_message.chat.username?"@"+m.reply_to_message.chat.username:""+m.reply_to_message.chat.id;
+  }
+  if(m.video){
+    result.msg_type="video";
+    result.file_id=m.video.file_id;
+    result.file_unique_id=m.video.file_unique_id;
+    result.mime_type=m.video.mime_type||null;
+    result.file_size=m.video.file_size||null;
+    result.duration=m.video.duration||null;
+  }else if(m.audio){
+    result.msg_type="audio";
+    result.file_id=m.audio.file_id;
+    result.file_unique_id=m.audio.file_unique_id;
+    result.mime_type=m.audio.mime_type||"audio/mpeg";
+    result.file_size=m.audio.file_size||null;
+    result.duration=m.audio.duration||null;
+    result.file_name=m.audio.file_name||null;
+  }else if(m.voice){
+    result.msg_type="voice";
+    result.file_id=m.voice.file_id;
+    result.file_unique_id=m.voice.file_unique_id;
+    result.mime_type=m.voice.mime_type||"audio/ogg";
+    result.file_size=m.voice.file_size||null;
+    result.duration=m.voice.duration||null;
+  }else if(m.photo&&m.photo.length){
+    result.msg_type="photo";
+    var best=m.photo[m.photo.length-1];
+    result.file_id=best.file_id;
+    result.file_unique_id=best.file_unique_id;
+    result.file_size=best.file_size||null;
+  }else if(m.document){
+    result.msg_type="document";
+    result.file_id=m.document.file_id;
+    result.file_unique_id=m.document.file_unique_id;
+    result.mime_type=m.document.mime_type||null;
+    result.file_size=m.document.file_size||null;
+  }
+  return result;
+}
+
+var mimeTypes={
+  ".html":"text/html",".css":"text/css",".js":"application/javascript",".json":"application/json",
+  ".png":"image/png",".jpg":"image/jpeg",".jpeg":"image/jpeg",".gif":"image/gif",".svg":"image/svg+xml",
+  ".ico":"image/x-icon",".woff2":"font/woff2",".woff":"font/woff",".ttf":"font/ttf",".eot":"application/vnd.ms-fontobject",
+};
+
+addEventListener('fetch', event => {
+  event.respondWith((async()=>{
+    var request=event.request;
+    var url=new URL(request.url);
+    var path=url.pathname;
+    var method=request.method;
+
+    if(method==="OPTIONS")return new Response(null,{headers:cors});
+
+    if(path.startsWith("/api/")){
+      var d=db(DB);
+      var botAPI=tg(TELEGRAM_BOT_TOKEN);
+
+      // -- Public API --
+      if(method==="GET"&&path==="/api/songs")return json({ok:true,data:await d.getSongs(true,safeInt(url.searchParams.get("limit"),50),safeInt(url.searchParams.get("offset"),0))});
+
+      var m=path.match(/^\/api\/songs\/(\d+)$/);
+      if(m&&method==="GET"){var song=await d.getSong(parseInt(m[1]));return song?json({ok:true,data:song}):err("Not found",404);}
+
+      m=path.match(/^\/api\/songs\/(\d+)\/next$/);
+      if(m&&method==="GET"){var next=await d.getNextSong(parseInt(m[1]));return next?json({ok:true,data:next}):err("No next",404);}
+
+      m=path.match(/^\/api\/song\/(\d+)\/podcasts$/);
+      if(m&&method==="GET"){var ps=await DB.prepare("SELECT * FROM audio_breakdowns WHERE song_id=? AND visible=1 ORDER BY id ASC").bind(parseInt(m[1])).all();return json({ok:true,data:(ps.results||[])});}
+
+      m=path.match(/^\/api\/media\/(\d+)$/);
+      if(m&&method==="GET"){
+        try{
+          var song=await d.getSong(parseInt(m[1]));
+          if(!song)return err("Not found",404);
+          var mediaUrl=song.suno_audio_url;
+          if(song.tg_video_url){
+            if(song.tg_file_id){var fileInfo=await botAPI.getFile(song.tg_file_id);mediaUrl=botAPI.getFileUrl(fileInfo.file_path);}
+            else mediaUrl=song.tg_video_url;
+          }
+          if(!mediaUrl)return err("No media",404);
+          var tgResp=await fetch(mediaUrl);
+          var hdrs={"Content-Type":song.suno_audio_url&&!song.tg_video_url?"audio/mpeg":"video/mp4","Cache-Control":"public, max-age=86400"};
+          if(tgResp.headers.get("Content-Range"))hdrs["Content-Range"]=tgResp.headers.get("Content-Range");
+          if(tgResp.headers.get("Content-Length"))hdrs["Content-Length"]=tgResp.headers.get("Content-Length");
+          if(tgResp.headers.get("Accept-Ranges"))hdrs["Accept-Ranges"]=tgResp.headers.get("Accept-Ranges");
+          return new Response(tgResp.body,{status:tgResp.ok?200:tgResp.status,headers:Object.assign({},cors,hdrs)});
+        }catch(e){return err("Proxy error: "+e.message);}
+      }
+
+      // -- Webhook (validated via Telegram secret_token) --
+      if(method==="POST"&&path==="/api/webhook"){
+        try{
+          var whSecret=url.searchParams.get("secret")||"";
+          if(whSecret!==WEBHOOK_SECRET)return json({ok:true});
+          var update=await request.json();
+          var p=parseMsgFull(update);
+          if(!p||!p.tg_msg_id)return json({ok:true});
+          // Store message in DB
+          if(p.chat_type==="channel"||p.chat_type==="group"){
+            var msgId=await d.storeMessage(p);
+            // If it's a forwarded channel post (group copy), try to resolve file URL
+            if(msgId&&p.forward_from_chat_id&&p.forward_from_msg_id&&p.file_id){
+              try{var fileInfo=await botAPI.getFile(p.file_id);p.file_url=botAPI.getFileUrl(fileInfo.file_path);}catch(e){}
+            }
+            if(msgId&&p.file_url){
+              await DB.prepare("UPDATE messages SET file_url=? WHERE id=?").bind(p.file_url,msgId).run();
+            }
+          }
+          // Song creation (existing flow)
+          var isSong=(p.msg_type==="video"||p.msg_type==="audio"||(p.msg_type==="document"&&p.mime_type&&p.mime_type.startsWith("audio/")))&&p.file_id;
+          var songObj=null;
+          if(isSong){
+            if(await d.getByTgMsg(p.tg_msg_id))return json({ok:true});
+            var fileInfo;
+            try{fileInfo=await botAPI.getFile(p.file_id);}catch(e){return json({ok:true});}
+            songObj={title:firstLine(p.text_content),lyrics:p.text_content||null,telegram_message_id:p.tg_msg_id,published_at:p.published_at};
+            if(p.msg_type==="video"){
+              songObj.tg_video_url=botAPI.getFileUrl(fileInfo.file_path);
+              songObj.tg_file_id=p.file_id;
+            }else{
+              songObj.suno_audio_url=botAPI.getFileUrl(fileInfo.file_path);
+            }
+            await d.upsertSong(songObj);
+          }
+          // Auto-detect Suno links in text content
+          var sunoUrls=sunoExtractUrls(p.text_content);
+          if(sunoUrls.length){
+            var targetSongId=null;
+            if(songObj){var tmp=await d.getByTgMsg(p.tg_msg_id);if(tmp)targetSongId=tmp.id;}
+            if(!targetSongId&&p.forward_from_msg_id){var tmp=await d.getByTgMsg(p.forward_from_msg_id);if(tmp)targetSongId=tmp.id;}
+            for(var si=0;si<sunoUrls.length;si++){
+              var sinfo=await processSunoUrl(sunoUrls[si]);
+              if(sinfo){
+                var upd={suno_audio_url:sinfo.audioUrl,suno_cover_url:sinfo.coverUrl,suno_track_url:sinfo.trackUrl};
+                if(targetSongId){
+                  var cur=await d.getSong(targetSongId);
+                  if(cur){
+                    upd.id=targetSongId;
+                    upd.title=cur.title||sinfo.title;
+                    upd.lyrics=cur.lyrics||p.text_content||null;
+                    upd.telegram_message_id=cur.telegram_message_id||p.tg_msg_id;
+                    upd.published_at=cur.published_at||p.published_at;
+                  }
+                }else{
+                  upd.title=sinfo.title;
+                  upd.lyrics=p.text_content||null;
+                  upd.telegram_message_id=p.tg_msg_id;
+                  upd.published_at=p.published_at;
+                }
+                var saved=await d.upsertSong(upd);
+                if(!targetSongId)targetSongId=saved.id;
+              }
+            }
+          }
+          return json({ok:true});
+        }catch(e){return err("Webhook error: "+e.message);}
+      }
+
+      // -- Admin login --
+      if(method==="POST"&&path==="/api/admin/login"){
+        var body=await request.json();
+        if(!body.password)return err("Password required",400);
+        if(body.password===ADMIN_PASSWORD){
+          var token=genToken();
+          var exp=new Date(Date.now()+86400000).toISOString();
+          await d.createSession(token,exp);
+          return json({ok:true,data:{token:token}});
+        }
+        // Anti brute-force: delay on failed attempt
+        await new Promise(function(r){return setTimeout(r,1000);});
+        return err("Invalid password",401);
+      }
+
+      // -- Admin routes --
+      if(path.startsWith("/api/admin/")){
+        if(!await isAuth(request,DB))return err("Unauthorized",401);
+
+        // Songs CRUD
+        if(method==="GET"&&path==="/api/admin/songs")return json({ok:true,data:await d.getSongs(false,9999,0)});
+        if(method==="POST"&&path==="/api/admin/songs"){
+          var body=await request.json();
+          if(body.title===undefined&&body.lyrics===undefined)return err("title or lyrics required",400);
+          if(body.id)return err("Use PUT /api/admin/songs/:id to update",400);
+          return json({ok:true,data:await d.upsertSong(body)},201);
+        }
+        if(method==="PUT"&&path==="/api/admin/songs"){
+          var body=await request.json();
+          if(body.ids){await d.reorderSongs(body.ids);return json({ok:true});}
+          return err("Invalid",400);
+        }
+        m=path.match(/^\/api\/admin\/songs\/(\d+)$/);
+        if(m&&method==="GET"){var song=await d.getSong(parseInt(m[1]));return song?json({ok:true,data:song}):err("Not found",404);}
+        if(m&&method==="PUT"){
+          var body=await request.json();
+          body.id=parseInt(m[1]);
+          if(!body.id)return err("Invalid song id",400);
+          return json({ok:true,data:await d.upsertSong(body)});
+        }
+        if(m&&method==="DELETE"){await d.deleteSong(parseInt(m[1]));return json({ok:true});}
+
+        // Podcast endpoints
+        m=path.match(/^\/api\/admin\/songs\/(\d+)\/podcasts$/);
+        if(m&&method==="GET"){var ps=await DB.prepare("SELECT * FROM audio_breakdowns WHERE song_id=? AND visible=1 ORDER BY id ASC").bind(parseInt(m[1])).all();return json({ok:true,data:(ps.results||[])});}
+
+        if(method==="GET"&&path==="/api/admin/audio-files"){
+          var rows=await DB.prepare("SELECT * FROM messages WHERE chat_type='group' AND msg_type='audio' AND file_url IS NOT NULL ORDER BY published_at DESC LIMIT 200").all();
+          return json({ok:true,data:(rows.results||[])});
+        }
+
+        if(method==="POST"&&path==="/api/admin/attach-podcast"){
+          var body=await request.json();
+          if(!body.song_id||!body.file_url)return err("song_id and file_url required",400);
+          var r=await DB.prepare("INSERT INTO audio_breakdowns(song_id,title,file_url,duration,telegram_message_id) VALUES(?,?,?,?,?)").bind(body.song_id,body.title||"Podcast",body.file_url,body.duration||null,body.telegram_message_id||null).run();
+          return json({ok:true,data:{id:r.meta.last_row_id}});
+        }
+
+        m=path.match(/^\/api\/admin\/podcast\/(\d+)$/);
+        if(m&&method==="DELETE"){await DB.prepare("UPDATE audio_breakdowns SET visible=0 WHERE id=?").bind(parseInt(m[1])).run();return json({ok:true});}
+
+        if(method==="POST"&&path==="/api/admin/resolve-podcast-files"){
+          var rows=await DB.prepare("SELECT * FROM messages WHERE chat_type='group' AND msg_type='audio' AND file_id IS NOT NULL AND file_url IS NULL LIMIT 50").all();
+          var resolved=0;
+          for(var ri=0;ri<(rows.results||[]).length;ri++){
+            var msg=rows.results[ri];
+            try{var fi=await botAPI.getFile(msg.file_id);await DB.prepare("UPDATE messages SET file_url=? WHERE id=?").bind(botAPI.getFileUrl(fi.file_path),msg.id).run();resolved++;}catch(ex){}
+          }
+          return json({ok:true,data:{resolved:resolved,remaining:(rows.results||[]).length-resolved}});
+        }
+
+        // Setup webhook
+        if(method==="POST"&&path==="/api/admin/setup-webhook"){
+          try{
+            var tgBase="https://api.telegram.org/bot"+TELEGRAM_BOT_TOKEN;
+            var whUrl=url.searchParams.get("url")||"https://poetry.shemax.workers.dev/api/webhook";
+            var meResp=await(await fetch(tgBase+"/getMe")).json();
+            if(!meResp.ok)return json({ok:true,data:{error:"Bot token invalid",me:meResp}});
+            var tgResp=await(await fetch(tgBase+"/setWebhook",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({url:whUrl,allowed_updates:["message","channel_post"]})})).json();
+            return json({ok:true,data:{me:meResp.result,webhook:tgResp}});
+          }catch(e){return err("Webhook setup failed: "+e.message);}
+        }
+
+        // Import from channel (forward old posts to group)
+        if(method==="POST"&&path==="/api/admin/import-channel"){
+          try{
+            var body=await request.json();
+            if(!body.channel||!body.message_ids)return err("channel and message_ids required",400);
+            var ids=[];
+            var parts=body.message_ids.split(",");
+            for(var k=0;k<parts.length;k++){
+              var p=parts[k].trim();
+              var range=p.split("-");
+              if(range.length===2){var s=parseInt(range[0]),e=parseInt(range[1]);for(var n=s;n<=e;n++)ids.push(n);}
+              else{var n=parseInt(p);if(!isNaN(n))ids.push(n);}
+            }
+            if(!ids.length)return err("No valid IDs",400);
+            var tgBase="https://api.telegram.org/bot"+TELEGRAM_BOT_TOKEN;
+            var imported=0,errors=[];
+            var target=body.target||"@ShemaxPoetryFreeChat";
+            for(var k=0;k<ids.length;k++){
+              try{
+                var r=await(await fetch(tgBase+"/forwardMessage",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({chat_id:target,from_chat_id:body.channel,message_id:ids[k]})})).json();
+                if(r.ok)imported++;
+                else errors.push({id:ids[k],error:r.description});
+              }catch(e){errors.push({id:ids[k],error:e.message});}
+              await new Promise(function(r){return setTimeout(r,300);});
+            }
+            return json({ok:true,data:{imported:imported,errors:errors}});
+          }catch(e){return err("Import error: "+e.message);}
+        }
+
+        // Sync pending updates
+        if(method==="POST"&&path==="/api/admin/sync"){
+          try{
+            var tgBase="https://api.telegram.org/bot"+TELEGRAM_BOT_TOKEN;
+            var whInfo=await(await fetch(tgBase+"/getWebhookInfo")).json();
+            var oldUrl=whInfo.ok?whInfo.result.url:null;
+            if(oldUrl)await fetch(tgBase+"/deleteWebhook",{method:"POST"});
+            await new Promise(function(r){return setTimeout(r,200);});
+            var updates=await(await fetch(tgBase+"/getUpdates",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({timeout:5,allowed_updates:["message","channel_post"]})})).json();
+            var synced=0;
+            if(updates.ok&&updates.result){
+              for(var i=0;i<updates.result.length;i++){
+                var p=parseMsgFull(updates.result[i]);
+                if(!p||!p.tg_msg_id)continue;
+                await d.storeMessage(p);
+                var isSong=(p.msg_type==="video"||p.msg_type==="audio"||(p.msg_type==="document"&&p.mime_type&&p.mime_type.startsWith("audio/")))&&p.file_id;
+                if(isSong&&!(await d.getByTgMsg(p.tg_msg_id))){
+                  var fileInfo;
+                  try{fileInfo=await botAPI.getFile(p.file_id);}catch(e){continue;}
+                  var songObj={title:firstLine(p.text_content),lyrics:p.text_content||null,telegram_message_id:p.tg_msg_id,published_at:p.published_at};
+                  if(p.msg_type==="video"){songObj.tg_video_url=botAPI.getFileUrl(fileInfo.file_path);songObj.tg_file_id=p.file_id;}
+                  else songObj.suno_audio_url=botAPI.getFileUrl(fileInfo.file_path);
+                  await d.upsertSong(songObj);
+                  synced++;
+                }
+              }
+            }
+            if(oldUrl)await fetch(tgBase+"/setWebhook",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({url:oldUrl,allowed_updates:["message","channel_post"]})});
+            return json({ok:true,data:{synced:synced}});
+          }catch(e){return err("Sync error: "+e.message);}
+        }
+
+        // -- Suno fetch endpoint --
+        if(method==="POST"&&path==="/api/admin/suno"){
+          try{
+            var body=await request.json();
+            if(!body.url)return err("url required",400);
+            var info=await sunoFetch(body.url);
+            return json({ok:true,data:{title:info.title,coverUrl:info.coverUrl,audioUrl:info.audioUrl,duration:info.duration}});
+          }catch(e){return err("Suno error: "+e.message);}
+        }
+
+        // -- Daily sync: update Suno data for all songs with suno_track_url or suno links in lyrics --
+        if(method==="POST"&&path==="/api/admin/daily-sync"){
+          try{
+            var checked=0,updated=0,errors=[];
+            // Find songs with suno_track_url but missing suno_audio_url
+            var rows1=await DB.prepare("SELECT * FROM songs WHERE suno_track_url IS NOT NULL AND (suno_audio_url IS NULL OR suno_audio_url='')").all();
+            for(var i=0;i<(rows1.results||[]).length;i++){
+              var song=rows1.results[i];checked++;
+              try{
+                var info=await sunoFetch(song.suno_track_url);
+                if(info&&info.audioUrl){
+                  await DB.prepare("UPDATE songs SET suno_audio_url=?,suno_cover_url=?,title=COALESCE(NULLIF(title,'Untitled'),?),updated_at=datetime('now') WHERE id=?").bind(info.audioUrl,info.coverUrl,info.title,song.id).run();
+                  updated++;
+                }
+              }catch(e){errors.push({id:song.id,error:e.message});}
+            }
+            // Find songs with suno links in lyrics but no suno_track_url or suno_audio_url
+            var rows2=await DB.prepare("SELECT * FROM songs WHERE lyrics LIKE '%suno.com%' AND (suno_audio_url IS NULL OR suno_audio_url='')").all();
+            for(var i=0;i<(rows2.results||[]).length;i++){
+              var song=rows2.results[i];checked++;
+              var urls=sunoExtractUrls(song.lyrics);
+              for(var j=0;j<urls.length;j++){
+                try{
+                  if(song.suno_track_url&&song.suno_track_url!==urls[j])continue;
+                  var info=await sunoFetch(urls[j]);
+                  if(info&&info.audioUrl){
+                    await DB.prepare("UPDATE songs SET suno_audio_url=?,suno_cover_url=?,suno_track_url=?,title=COALESCE(NULLIF(title,'Untitled'),?),updated_at=datetime('now') WHERE id=?").bind(info.audioUrl,info.coverUrl,urls[j],info.title,song.id).run();
+                    updated++;
+                    break;
+                  }
+                }catch(e){errors.push({id:song.id,url:urls[j],error:e.message});}
+              }
+            }
+            return json({ok:true,data:{checked:checked,updated:updated,errors:errors.length}});
+          }catch(e){return err("Daily sync error: "+e.message);}
+        }
+
+        // -- Scan channel (discover all channel messages by probing IDs with delays) --
+        if(method==="POST"&&path==="/api/admin/scan-channel"){
+          try{
+            var body=await request.json();
+            var channel=body.channel||"@shemaxpoetry";
+            var fromId=parseInt(body.from)||2;
+            var toId=parseInt(body.to)||2000;
+            var target=body.target||"@ShemaxPoetryFreeChat";
+            var delayMs=parseInt(body.delayMs)||1500;
+            var maxEmpties=parseInt(body.maxEmpties)||10;
+            var tgBase="https://api.telegram.org/bot"+TELEGRAM_BOT_TOKEN;
+            var found=[],errors=[],consecutiveEmpty=0;
+            for(var id=fromId;id<=toId;id++){
+              try{
+                var r=await(await fetch(tgBase+"/forwardMessage",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({chat_id:target,from_chat_id:channel,message_id:id})})).json();
+                if(r.ok){
+                  consecutiveEmpty=0;
+                  found.push(id);
+                  var fwd=r.result;
+                  var msgData={
+                    tg_msg_id:fwd.message_id,chat_id:target,chat_type:"group",msg_type:"text",
+                    text_content:fwd.caption||fwd.text||null,file_id:null,file_unique_id:null,file_url:null,
+                    mime_type:null,file_size:null,duration:null,file_name:null,cover_file_id:null,
+                    forward_from_chat_id:channel,forward_from_msg_id:id,
+                    reply_to_msg_id:null,reply_to_chat_id:null,
+                    published_at:new Date((fwd.date||0)*1000).toISOString(),
+                };
+                  if(fwd.video){
+                    msgData.msg_type="video";msgData.file_id=fwd.video.file_id;msgData.file_unique_id=fwd.video.file_unique_id;
+                    msgData.mime_type=fwd.video.mime_type||null;msgData.file_size=fwd.video.file_size||null;msgData.duration=fwd.video.duration||null;
+                    if(fwd.video.thumbnail)msgData.cover_file_id=fwd.video.thumbnail.file_id;
+                  }
+                  else if(fwd.audio){
+                    msgData.msg_type="audio";msgData.file_id=fwd.audio.file_id;msgData.file_unique_id=fwd.audio.file_unique_id;
+                    msgData.mime_type=fwd.audio.mime_type||null;msgData.file_size=fwd.audio.file_size||null;msgData.duration=fwd.audio.duration||null;
+                    msgData.file_name=fwd.audio.file_name||null;
+                  }
+                  else if(fwd.voice){
+                    msgData.msg_type="voice";msgData.file_id=fwd.voice.file_id;msgData.file_unique_id=fwd.voice.file_unique_id;
+                    msgData.mime_type="audio/ogg";msgData.file_size=fwd.voice.file_size||null;msgData.duration=fwd.voice.duration||null;
+                  }
+                  else if(fwd.photo&&fwd.photo.length){
+                    msgData.msg_type="photo";var bp=fwd.photo[fwd.photo.length-1];msgData.file_id=bp.file_id;msgData.file_unique_id=bp.file_unique_id;
+                    msgData.cover_file_id=bp.file_id; // use the largest photo as cover
+                  }
+                  else if(fwd.document){
+                    msgData.msg_type="document";msgData.file_id=fwd.document.file_id;msgData.file_unique_id=fwd.document.file_unique_id;
+                    msgData.mime_type=fwd.document.mime_type||null;msgData.file_size=fwd.document.file_size||null;
+                  }
+                  await d.storeMessage(msgData);
+                }else{
+                  consecutiveEmpty++;
+                  if(consecutiveEmpty>=maxEmpties)break;
+                }
+              }catch(e){
+                consecutiveEmpty++;
+                errors.push({id:id,error:e.message});
+                if(consecutiveEmpty>=maxEmpties)break;
+              }
+              await new Promise(function(r){return setTimeout(r,delayMs);});
+            }
+            return json({ok:true,data:{found:found,count:found.length,scannedUpTo:found.length?found[found.length-1]:fromId,nextFrom:found.length?found[found.length-1]+1:fromId,errors:errors}});
+          }catch(e){return err("Scan error: "+e.message);}
+        }
+
+        // -- NEW: Get publications (channel posts grouped with comments) --
+        if(method==="GET"&&path==="/api/admin/publications"){
+          try{
+            var pubs=await d.getPublications();
+            return json({ok:true,data:pubs});
+          }catch(e){return err("Publications error: "+e.message);}
+        }
+
+        // -- NEW: Query messages --
+        if(method==="GET"&&path==="/api/admin/messages"){
+          try{
+            var chatType=url.searchParams.get("chat_type")||null;
+            var limit=parseInt(url.searchParams.get("limit")||"100");
+            var offset=parseInt(url.searchParams.get("offset")||"0");
+            var msgs=await d.getMessages(chatType,limit,offset);
+            var stats=await d.getMessageStats();
+            return json({ok:true,data:{messages:msgs,stats:stats}});
+          }catch(e){return err("Messages error: "+e.message);}
+        }
+
+        // -- NEW: Resolve file URLs for messages with file_id but no file_url --
+        if(method==="POST"&&path==="/api/admin/resolve-files"){
+          try{
+            var limit=parseInt((await request.json()).limit||"50");
+            var rows=await DB.prepare("SELECT * FROM messages WHERE file_id IS NOT NULL AND file_url IS NULL LIMIT ?").bind(limit).all();
+            var resolved=0;
+            for(var i=0;i<(rows.results||[]).length;i++){
+              var msg=rows.results[i];
+              try{var fi=await botAPI.getFile(msg.file_id);await DB.prepare("UPDATE messages SET file_url=? WHERE id=?").bind(botAPI.getFileUrl(fi.file_path),msg.id).run();resolved++;}catch(ex){}
+            }
+            return json({ok:true,data:{resolved:resolved,remaining:limit-resolved}});
+          }catch(e){return err("Resolve error: "+e.message);}
+        }
+
+        // -- NEW: Resolve cover URLs from thumbnail file_ids --
+        if(method==="POST"&&path==="/api/admin/resolve-covers"){
+          try{
+            var limit=parseInt((await request.json()).limit||"100");
+            var rows=await DB.prepare("SELECT * FROM messages WHERE cover_file_id IS NOT NULL AND cover_url IS NULL LIMIT ?").bind(limit).all();
+            var resolved=0;
+            for(var i=0;i<(rows.results||[]).length;i++){
+              var msg=rows.results[i];
+              try{
+                var fi=await botAPI.getFile(msg.cover_file_id);
+                var cu=botAPI.getFileUrl(fi.file_path);
+                await DB.prepare("UPDATE messages SET cover_url=? WHERE id=?").bind(cu,msg.id).run();
+                // If this message is linked to a song, copy cover_url
+                if(msg.forward_from_msg_id){
+                  var song=await DB.prepare("SELECT id FROM songs WHERE telegram_message_id=? AND (cover_url IS NULL OR cover_url='')").bind(msg.forward_from_msg_id).first();
+                  if(song)await DB.prepare("UPDATE songs SET cover_url=? WHERE id=?").bind(cu,song.id).run();
+                }
+                resolved++;
+              }catch(ex){}
+            }
+            return json({ok:true,data:{resolved:resolved,remaining:(rows.results||[]).length-resolved}});
+          }catch(e){return err("Resolve covers error: "+e.message);}
+        }
+
+        // -- NEW: Create songs from scanned messages with media --
+        if(method==="POST"&&path==="/api/admin/create-songs"){
+          try{
+            var body=await request.json();
+            var limit=parseInt(body.limit||"100");
+            var offset=parseInt(body.offset||"0");
+            // Find messages with media, forwarded from channel, not yet a song
+            var rows=await DB.prepare("SELECT m.* FROM messages m LEFT JOIN songs s ON s.telegram_message_id=m.forward_from_msg_id WHERE m.forward_from_msg_id IS NOT NULL AND m.file_id IS NOT NULL AND (m.msg_type='video' OR m.msg_type='audio' OR (m.msg_type='voice')) AND s.id IS NULL GROUP BY m.forward_from_msg_id ORDER BY m.forward_from_msg_id ASC LIMIT ? OFFSET ?").bind(limit,offset).all();
+            var created=0;
+            for(var i=0;i<(rows.results||[]).length;i++){
+              var msg=rows.results[i];
+              try{
+                var title=firstLine(msg.text_content)||("Song #"+msg.forward_from_msg_id);
+                var songData={title:title,lyrics:msg.text_content||null,telegram_message_id:msg.forward_from_msg_id,published_at:msg.published_at};
+                if(msg.msg_type==="video"){
+                  songData.tg_file_id=msg.file_id;
+                  // Try to resolve file URL
+                  try{var fi=await botAPI.getFile(msg.file_id);songData.tg_video_url=botAPI.getFileUrl(fi.file_path);}catch(e){}
+                }else if(msg.msg_type==="audio"||msg.msg_type==="voice"){
+                  try{var fi=await botAPI.getFile(msg.file_id);songData.suno_audio_url=botAPI.getFileUrl(fi.file_path);}catch(e){}
+                }
+                if(msg.cover_url)songData.cover_url=msg.cover_url;
+                await d.upsertSong(songData);
+                created++;
+              }catch(e){}
+            }
+            var remaining=await DB.prepare("SELECT COUNT(DISTINCT m.forward_from_msg_id) as c FROM messages m LEFT JOIN songs s ON s.telegram_message_id=m.forward_from_msg_id WHERE m.forward_from_msg_id IS NOT NULL AND m.file_id IS NOT NULL AND (m.msg_type='video' OR m.msg_type='audio' OR m.msg_type='voice') AND s.id IS NULL").first();
+            return json({ok:true,data:{created:created,remaining:(remaining&&remaining.c)||0}});
+          }catch(e){return err("Create songs error: "+e.message);}
+        }
+
+        // -- NEW: Search Suno by song title (for songs without Suno links) --
+        if(method==="POST"&&path==="/api/admin/search-suno"){
+          try{
+            var body=await request.json();
+            var limit=parseInt(body.limit||"20");
+            var offset=parseInt(body.offset||"0");
+            // Find songs with no suno_track_url, have a title, visible
+            var rows=await DB.prepare("SELECT id,title,cover_url FROM songs WHERE (suno_track_url IS NULL OR suno_track_url='') AND title IS NOT NULL AND title!='' AND title!='Untitled' AND visible=1 ORDER BY published_at DESC LIMIT ? OFFSET ?").bind(limit,offset).all();
+            var searched=0,found=0;
+            for(var i=0;i<(rows.results||[]).length;i++){
+              var song=rows.results[i];searched++;
+              // Try opensuno with constructed track URLs (limited: require exact Suno URL to work)
+              // Instead: check if lyrics contain a suno.com link
+              var full=await DB.prepare("SELECT lyrics FROM songs WHERE id=?").bind(song.id).first();
+              if(full&&full.lyrics){
+                var urls=sunoExtractUrls(full.lyrics);
+                if(urls.length){
+                  for(var j=0;j<urls.length;j++){
+                    try{
+                      var info=await sunoFetch(urls[j]);
+                      if(info&&info.audioUrl){
+                        await DB.prepare("UPDATE songs SET suno_audio_url=?,suno_cover_url=?,suno_track_url=?,cover_url=COALESCE(?,cover_url),title=? WHERE id=?").bind(info.audioUrl,info.coverUrl,urls[j],info.coverUrl,info.title,song.id).run();
+                        found++;
+                        break;
+                      }
+                    }catch(e){}
+                  }
+                }
+              }
+            }
+            return json({ok:true,data:{searched:searched,found:found}});
+          }catch(e){return err("Search Suno error: "+e.message);}
+        }
+
+        // -- NEW: Verify DB against channel --
+        if(method==="GET"&&path==="/api/admin/verify-db"){
+          try{
+            var pubs=await d.getPublications();
+            var stats=await d.getMessageStats();
+            var songCount=(await d.getSongs(false,9999,0)).length;
+            var activeSongCount=(await d.getSongs(true,9999,0)).length;
+            var withVideo=0,withAudio=0,withFile=0,withSuno=0,withCover=0;
+            for(var i=0;i<pubs.length;i++){
+              if(pubs[i].post.file_url)withFile++;
+              if(pubs[i].post.msg_type==="video")withVideo++;
+              if(pubs[i].post.msg_type==="audio"||pubs[i].post.msg_type==="voice")withAudio++;
+              if(pubs[i].song&&pubs[i].song.suno_audio_url)withSuno++;
+              if(pubs[i].song&&(pubs[i].song.cover_url||pubs[i].song.suno_cover_url))withCover++;
+            }
+            var missingChannel=[];var totalComments=0;
+            for(var i=0;i<pubs.length;i++){totalComments+=pubs[i].comments.length;}
+            var maxId=0;
+            for(var i=0;i<pubs.length;i++){if(pubs[i].post.channel_msg_id>maxId)maxId=pubs[i].post.channel_msg_id;}
+            return json({ok:true,data:{
+              stats:stats,
+              songs:{total:songCount,active:activeSongCount},
+              publications:{count:pubs.length,withVideo:withVideo,withAudio:withAudio,withMedia:withFile,withSuno:withSuno,withCover:withCover,comments:totalComments},
+              knownChannelIds:pubs.map(function(p){return p.post.channel_msg_id;}),
+              maxChannelId:maxId,
+              recommendations:null,
+            }});
+          }catch(e){return err("Verify error: "+e.message);}
+        }
+
+        return err("Not found",404);
+      }
+
+      return err("Not found",404);
+    }
+
+    // Static files from KV
+    var key=path==="/"?"index.html":path.substring(1);
+    try{
+      var value=await STATIC.get(key,{type:"stream"});
+      if(value===null){
+        if(key.endsWith("/"))key+="index.html";
+        else key+="/index.html";
+        value=await STATIC.get(key,{type:"stream"});
+        if(value===null)return err("Not found",404);
+      }
+      var ext=key.substring(key.lastIndexOf("."));
+      var ct=mimeTypes[ext]||"application/octet-stream";
+      return new Response(value,{headers:{"Content-Type":ct,"Cache-Control":"no-cache, must-revalidate"}});
+    }catch(e){
+      return err("Static error: "+e.message);
+    }
+  })());
+});
+
+addEventListener('scheduled', event => {
+  event.waitUntil((async()=>{
+    // Daily sync at 6:00 UTC — process Suno songs
+    try{
+      var rows1=await DB.prepare("SELECT * FROM songs WHERE suno_track_url IS NOT NULL AND (suno_audio_url IS NULL OR suno_audio_url='')").all();
+      for(var i=0;i<(rows1.results||[]).length;i++){
+        var song=rows1.results[i];
+        try{
+          var info=await sunoFetch(song.suno_track_url);
+          if(info&&info.audioUrl){
+            await DB.prepare("UPDATE songs SET suno_audio_url=?,suno_cover_url=?,title=COALESCE(NULLIF(title,'Untitled'),?),updated_at=datetime('now') WHERE id=?").bind(info.audioUrl,info.coverUrl,info.title,song.id).run();
+          }
+        }catch(e){}
+      }
+      var rows2=await DB.prepare("SELECT * FROM songs WHERE lyrics LIKE '%suno.com%' AND (suno_audio_url IS NULL OR suno_audio_url='')").all();
+      for(var i=0;i<(rows2.results||[]).length;i++){
+        var song=rows2.results[i];
+        var urls=sunoExtractUrls(song.lyrics);
+        for(var j=0;j<urls.length;j++){
+          try{
+            if(song.suno_track_url&&song.suno_track_url!==urls[j])continue;
+            var info=await sunoFetch(urls[j]);
+            if(info&&info.audioUrl){
+              await DB.prepare("UPDATE songs SET suno_audio_url=?,suno_cover_url=?,suno_track_url=?,title=COALESCE(NULLIF(title,'Untitled'),?),updated_at=datetime('now') WHERE id=?").bind(info.audioUrl,info.coverUrl,urls[j],info.title,song.id).run();
+              break;
+            }
+          }catch(e){}
+        }
+      }
+    }catch(e){}
+  })());
+});

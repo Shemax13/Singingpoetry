@@ -1,0 +1,9 @@
+node_modules/
+dist-functions/
+.wrangler/
+*.log
+.env
+scripts/deploy*.mjs
+/tmp/
+backups/
+dist/

@@ -1,0 +1,23 @@
+{
+  "name": "shemaxpoetry",
+  "version": "1.0.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "dev": "wrangler dev src/worker.js --d1 DB --test-scheduled",
+    "deploy:api": "node deploy.mjs",
+    "deploy": "wrangler deploy",
+    "migrate": "wrangler d1 migrations apply SHEMAX_DB",
+    "create-db": "wrangler d1 create SHEMAX_DB",
+    "test": "vitest run",
+    "test:watch": "vitest",
+    "lint": "eslint src/ public/js/",
+    "format": "prettier --write 'src/**/*.js' 'public/**/*.js' 'public/**/*.html' 'public/**/*.css'"
+  },
+  "devDependencies": {
+    "eslint": "^9.0.0",
+    "prettier": "^3.5.0",
+    "vitest": "^3.0.0",
+    "wrangler": "^4.105.0"
+  }
+}

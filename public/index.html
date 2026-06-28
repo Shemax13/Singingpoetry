@@ -1,0 +1,114 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1.0,maximum-scale=1.0,user-scalable=no">
+<title>Shemaxpoetry</title>
+<link rel="icon" href="/img/favicon.ico" sizes="32x32">
+<link rel="preconnect" href="https://api.telegram.org">
+<link rel="preconnect" href="https://cdn2.suno.ai">
+<link rel="preconnect" href="https://poetry.shemax.workers.dev">
+<link rel="stylesheet" href="/css/style.css">
+</head>
+<body>
+
+<div class="app-container" id="appContainer">
+  <!-- Desktop side screens -->
+  <div class="side-screen left" id="leftScreen" onclick="playLeft()">
+    <div class="side-cover" id="leftCover"><img src="/img/logo.png" class="side-placeholder-img" alt=""></div>
+    <div class="side-title" id="leftTitle"></div>
+  </div>
+
+  <!-- Center column: main player + dropdown menu -->
+  <div class="center-column">
+    <div class="main-screen" id="mainScreen">
+      <img class="main-cover" id="mainCover" alt="">
+      <video id="playerVideo" playsinline></video>
+      <canvas id="audioViz"></canvas>
+      <div class="main-overlay">
+        <div class="main-top">
+          <span class="main-logo">Shemax<span>poetry</span></span>
+          <button class="hamburger" id="hamburgerBtn" onclick="event.stopPropagation();toggleMenu()" aria-label="Menu">
+            <span></span><span></span><span></span>
+          </button>
+        </div>
+        <div class="main-center">
+          <button class="main-play-btn" id="mainPlayBtn">▶</button>
+          <div class="loading-indicator hidden" id="loadingIndicator"><span></span><span></span><span></span></div>
+        </div>
+        <div class="podcast-btn" id="podcastBtn" onclick="togglePodcast()" style="display:none">
+          <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 1a3 3 0 0 0-3 3v8a3 3 0 0 0 6 0V4a3 3 0 0 0-3-3z"/><path d="M19 10v2a7 7 0 0 1-14 0v-2"/><line x1="12" y1="19" x2="12" y2="23"/><line x1="8" y1="23" x2="16" y2="23"/></svg>
+        </div>
+        <div class="podcast-btn" id="linksBtn" onclick="toggleLinks()" style="display:none">
+          <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71"/><path d="M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71"/></svg>
+        </div>
+        <div class="main-bottom" id="mainBottom">
+          <div class="main-title-track" id="mainTitleTrack">
+            <span class="main-title-text" id="mainTitleText"></span>
+            <span class="main-title-text" id="mainTitleTextClone"></span>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Dropdown menu (overlay) -->
+    <div class="menu-dropdown" id="menuDropdown">
+      <div class="menu-dropdown-inner">
+        <div class="menu-tabs">
+          <button class="menu-tab active" data-tab="queue"><span data-i18n="navQueue">Очередь</span></button>
+          <button class="menu-tab" data-tab="songs"><span data-i18n="navSongs">Песни</span></button>
+          <button class="menu-tab" data-tab="about"><span data-i18n="navAbout">О проекте</span></button>
+          <button class="menu-tab lang-tab lang-toggle" onclick="toggleLang()">EN</button>
+          <button class="menu-tab close-tab" onclick="toggleMenu()" aria-label="Close menu">✕</button>
+        </div>
+        <div class="menu-scroll">
+          <div class="menu-panel active" id="menuQueue">
+            <div class="menu-list" id="menuQueueList"></div>
+          </div>
+          <div class="menu-panel" id="menuSongs">
+            <div class="menu-search-row">
+              <input class="menu-search" id="menuSearch" type="text" placeholder="" data-i18n-placeholder="searchPlaceholder">
+              <div class="lang-filter" id="langFilter">
+                <button class="lang-btn active" data-lang=""><span data-i18n="allLanguages">Все</span></button>
+                <button class="lang-btn" data-lang="ru">RU</button>
+                <button class="lang-btn" data-lang="en">EN</button>
+              </div>
+            </div>
+            <div class="menu-list" id="menuSongList"></div>
+          </div>
+          <div class="menu-panel" id="menuAbout">
+            <div class="about-content">
+              <h3 class="about-title" data-i18n="aboutTitle">О проекте</h3>
+              <p class="about-text" data-i18n="aboutText">Поэтический проект Shemaxpoetry</p>
+              <p style="margin-top:16px;font-size:0.85rem"><a href="/privacy" style="color:var(--accent);text-decoration:none" data-i18n="privacy">Политика конфиденциальности</a></p>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div class="side-screen right" id="rightScreen" onclick="playRight()">
+    <div class="side-cover" id="rightCover"><img src="/img/logo.png" class="side-placeholder-img" alt=""></div>
+    <div class="side-title" id="rightTitle"></div>
+  </div>
+</div>
+
+<!-- Links popup -->
+<div class="links-popup-overlay" id="linksPopup" onclick="closeLinks(event)">
+  <div class="links-popup">
+    <div class="links-popup-header">
+      <span data-i18n="externalLinks">Внешние ссылки</span>
+      <button class="links-popup-close" onclick="closeLinks()">✕</button>
+    </div>
+    <div class="links-popup-body" id="linksPopupBody"></div>
+  </div>
+</div>
+
+<!-- Hidden audio element -->
+<audio id="playerAudio" preload="none"></audio>
+
+<script src="/js/i18n.js"></script>
+<script src="/js/app.js"></script>
+</body>
+</html>
