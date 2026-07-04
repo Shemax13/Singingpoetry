@@ -734,7 +734,7 @@ export default {
       var ct = mimeTypes[ext] || "application/octet-stream";
       var isHtml = ext === ".html" || ext === ".htm";
       var isAdmin = key.indexOf("admin") !== -1;
-      var csp = "default-src 'self'; style-src 'self' 'unsafe-inline'; script-src 'self' 'unsafe-inline'" +
+      var csp = "default-src 'self'; style-src 'self' 'unsafe-inline'; script-src 'self'" +
         (isAdmin ? " https://challenges.cloudflare.com" : "") +
         "; img-src 'self' https://api.telegram.org https://cdn2.suno.ai https://poetry.shemax.workers.dev data:;" +
         " media-src 'self' https://api.telegram.org https://cdn2.suno.ai https://poetry.shemax.workers.dev;" +

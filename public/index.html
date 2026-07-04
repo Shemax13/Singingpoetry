@@ -14,7 +14,7 @@
 
 <div class="app-container" id="appContainer">
   <!-- Desktop side screens -->
-  <div class="side-screen left" id="leftScreen" onclick="playLeft()">
+  <div class="side-screen left" id="leftScreen">
     <div class="side-cover" id="leftCover"><img src="/img/logo.png" class="side-placeholder-img" alt=""></div>
     <div class="side-title" id="leftTitle"></div>
   </div>
@@ -28,7 +28,7 @@
       <div class="main-overlay">
         <div class="main-top">
           <span class="main-logo">Shemax<span>poetry</span></span>
-          <button class="hamburger" id="hamburgerBtn" onclick="event.stopPropagation();toggleMenu()" aria-label="Menu">
+          <button class="hamburger" id="hamburgerBtn" aria-label="Menu">
             <span></span><span></span><span></span>
           </button>
         </div>
@@ -36,10 +36,10 @@
           <button class="main-play-btn" id="mainPlayBtn">▶</button>
           <div class="loading-indicator hidden" id="loadingIndicator"><span></span><span></span><span></span></div>
         </div>
-        <div class="podcast-btn" id="podcastBtn" onclick="togglePodcast()" style="display:none">
+        <div class="podcast-btn" id="podcastBtn" style="display:none">
           <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 1a3 3 0 0 0-3 3v8a3 3 0 0 0 6 0V4a3 3 0 0 0-3-3z"/><path d="M19 10v2a7 7 0 0 1-14 0v-2"/><line x1="12" y1="19" x2="12" y2="23"/><line x1="8" y1="23" x2="16" y2="23"/></svg>
         </div>
-        <div class="podcast-btn" id="linksBtn" onclick="toggleLinks()" style="display:none">
+        <div class="podcast-btn" id="linksBtn" style="display:none">
           <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71"/><path d="M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71"/></svg>
         </div>
         <div class="main-bottom" id="mainBottom">
@@ -58,8 +58,8 @@
           <button class="menu-tab active" data-tab="queue"><span data-i18n="navQueue">Очередь</span></button>
           <button class="menu-tab" data-tab="songs"><span data-i18n="navSongs">Песни</span></button>
           <button class="menu-tab" data-tab="about"><span data-i18n="navAbout">О проекте</span></button>
-          <button class="menu-tab lang-tab lang-toggle" onclick="toggleLang()">EN</button>
-          <button class="menu-tab close-tab" onclick="toggleMenu()" aria-label="Close menu">✕</button>
+          <button class="menu-tab lang-tab lang-toggle" id="langToggleBtn">EN</button>
+          <button class="menu-tab close-tab" id="closeTabBtn" aria-label="Close menu">✕</button>
         </div>
         <div class="menu-scroll">
           <div class="menu-panel active" id="menuQueue">
@@ -88,18 +88,18 @@
     </div>
   </div>
 
-  <div class="side-screen right" id="rightScreen" onclick="playRight()">
+  <div class="side-screen right" id="rightScreen">
     <div class="side-cover" id="rightCover"><img src="/img/logo.png" class="side-placeholder-img" alt=""></div>
     <div class="side-title" id="rightTitle"></div>
   </div>
 </div>
 
 <!-- Links popup -->
-<div class="links-popup-overlay" id="linksPopup" onclick="closeLinks(event)">
+<div class="links-popup-overlay" id="linksPopup">
   <div class="links-popup">
     <div class="links-popup-header">
       <span data-i18n="externalLinks">Внешние ссылки</span>
-      <button class="links-popup-close" onclick="closeLinks()">✕</button>
+      <button class="links-popup-close" id="linksPopupCloseBtn">✕</button>
     </div>
     <div class="links-popup-body" id="linksPopupBody"></div>
   </div>
@@ -109,6 +109,7 @@
 <audio id="playerAudio" preload="none"></audio>
 
 <script src="/js/i18n.js"></script>
+<script src="/js/events.js"></script>
 <script src="/js/app.js"></script>
 </body>
 </html>

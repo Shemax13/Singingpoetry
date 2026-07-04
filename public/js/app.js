@@ -771,7 +771,7 @@ mainScreen.addEventListener('click', function(e) {
 
 // === Init ===
 
-document.addEventListener('DOMContentLoaded', function() {
+  document.addEventListener('DOMContentLoaded', function() {
   initI18n();
   loadSongs();
   resizeCanvas();
@@ -780,4 +780,14 @@ document.addEventListener('DOMContentLoaded', function() {
     navigator.mediaSession.setActionHandler('previoustrack', function(){ prevSong(); });
     navigator.mediaSession.setActionHandler('nexttrack', function(){ nextSong(); });
   }
+  // Event listeners (replaces old inline onclick handlers for CSP compliance)
+  $('leftScreen').addEventListener('click', function() { playLeft(); });
+  $('rightScreen').addEventListener('click', function() { playRight(); });
+  $('hamburgerBtn').addEventListener('click', function(e) { e.stopPropagation(); toggleMenu(); });
+  $('podcastBtn').addEventListener('click', function() { togglePodcast(); });
+  $('linksBtn').addEventListener('click', function() { toggleLinks(); });
+  $('langToggleBtn').addEventListener('click', function() { toggleLang(); });
+  $('closeTabBtn').addEventListener('click', function() { toggleMenu(); });
+  $('linksPopup').addEventListener('click', function(e) { closeLinks(e); });
+  $('linksPopupCloseBtn').addEventListener('click', function() { closeLinks(); });
 });
