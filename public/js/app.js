@@ -1,5 +1,4 @@
 const API = 'https://poetry.shemax.workers.dev/api';
-const MEDIA_URL_TTL = 1800000;
 const CACHE_TTL = 1800000;
 
 var playerQueue = [];
@@ -139,57 +138,36 @@ async function playSong(index) {
   if (videoEl._loadTimeout) clearTimeout(videoEl._loadTimeout);
   if (audioEl._loadTimeout) clearTimeout(audioEl._loadTimeout);
 
+  // Always use proxy for consistent edge caching
+  var proxyUrl = API + '/media/' + song.id;
+
   // Video
   videoEl.style.display = playerMode === 'video' ? 'block' : 'none';
-  var mediaSrc = song.tg_video_url;
-  if (!mediaSrc && song.resolvedMediaUrl && song._mediaUrlTs) {
-    if (Date.now() - song._mediaUrlTs < MEDIA_URL_TTL) {
-      mediaSrc = song.resolvedMediaUrl;
-    } else {
-      delete song.resolvedMediaUrl;
-      delete song._mediaUrlTs;
-    }
-  }
-  if (!mediaSrc) mediaSrc = API + '/media/' + song.id;
-
   if (hasVideo) {
-    videoEl.dataset.mediaFallback = mediaSrc !== (API + '/media/' + song.id) ? API + '/media/' + song.id : '';
-    videoEl.src = mediaSrc;
+    videoEl.src = proxyUrl;
     videoEl.load();
     videoEl._loadTimeout = setTimeout(function() {
       nextSong();
     }, 60000);
   } else {
     videoEl.removeAttribute('src');
-    delete videoEl.dataset.mediaFallback;
   }
 
   // Audio
   if (hasSunoAudio) {
-    var audioSrc = song.suno_audio_url;
-    var mediaApiUrl = API + '/media/' + song.id;
-    if (audioSrc && audioSrc.indexOf('api.telegram.org') !== -1) {
-      audioEl.dataset.mediaFallback = audioSrc;
-      audioSrc = mediaApiUrl;
-    } else {
-      delete audioEl.dataset.mediaFallback;
-    }
-    audioEl.src = audioSrc;
+    audioEl.src = proxyUrl;
     audioEl.load();
     audioEl._loadTimeout = setTimeout(function() {
       nextSong();
     }, 60000);
   } else if (hasPodcastAudio) {
-    var podcastSrc = song.podcast_audio_url;
-    audioEl.dataset.mediaFallback = podcastSrc !== (API + '/media/' + song.id) ? (API + '/media/' + song.id) : '';
-    audioEl.src = podcastSrc;
+    audioEl.src = proxyUrl;
     audioEl.load();
     audioEl._loadTimeout = setTimeout(function() {
       nextSong();
     }, 60000);
   } else {
     audioEl.removeAttribute('src');
-    delete audioEl.dataset.mediaFallback;
   }
 
   // Canvas
@@ -401,33 +379,19 @@ function preloadNextSong() {
   var nextIdx = currentIndex < playerQueue.length - 1 ? currentIndex + 1 : 0;
   if (nextIdx === currentIndex) return;
   var next = playerQueue[nextIdx];
-  if (!next) return;
-  if (next._preloaded) return;
+  if (!next || next._preloaded) return;
   next._preloaded = true;
-  var directUrl = next.tg_video_url || next.suno_audio_url || next.podcast_audio_url;
-  // Resolve actual media URL in background and warm cache
-  if (next.tg_file_id && !directUrl) {
-    fetch(API + '/tg-file-url/' + next.id).then(function(r){return r.json();}).then(function(j){
-      if (j.ok && j.url) {
-        next.resolvedMediaUrl = j.url;
-        next._mediaUrlTs = Date.now();
-        if (next._preloadLink) return;
-        var link = document.createElement('link');
-        link.rel = 'prefetch';
-        link.href = j.url;
-        link.as = 'audio';
-        next._preloadLink = link;
-        document.head.appendChild(link);
-        setTimeout(function(){if(link.parentNode)link.parentNode.removeChild(link);}, 10000);
-      }
-    }).catch(function(e){console.warn("preload failed",e);});
-  } else if (directUrl) {
-    var link = document.createElement('link');
-    link.rel = 'prefetch';
-    link.href = directUrl;
-    link.as = next.tg_video_url ? 'video' : 'audio';
-    document.head.appendChild(link);
-    setTimeout(function(){if(link.parentNode)link.parentNode.removeChild(link);}, 10000);
+  // Warm edge cache via proxy URL
+  var link = document.createElement('link');
+  link.rel = 'prefetch';
+  link.href = API + '/media/' + next.id;
+  link.as = next.tg_video_url ? 'video' : 'audio';
+  next._preloadLink = link;
+  document.head.appendChild(link);
+  setTimeout(function(){if(link.parentNode)link.parentNode.removeChild(link);}, 10000);
+  // Pre-resolve tg_file_id to warm the getFile cache on the Worker
+  if (next.tg_file_id) {
+    fetch(API + '/tg-file-url/' + next.id).catch(function(){});
   }
 }
 
@@ -459,13 +423,6 @@ audioEl.addEventListener('canplay', function() {
 videoEl.addEventListener('ended', function() { $('loadingIndicator').classList.add('hidden'); lastPlayedIndex = currentIndex; nextSong(); });
 videoEl.addEventListener('error', function() {
   $('loadingIndicator').classList.add('hidden');
-  var fallback = videoEl.dataset.mediaFallback;
-  if (fallback) {
-    videoEl.dataset.mediaFallback = '';
-    videoEl.src = fallback;
-    videoEl.load();
-    return;
-  }
   var nextIdx = nextPlayableIndex(currentIndex + 1);
   if (nextIdx !== currentIndex) { playSong(nextIdx); return; }
   nextSong();
@@ -483,13 +440,6 @@ audioEl.addEventListener('error', function() {
       $('podcastBtn').style.display = 'none';
       if (podcastReturnIndex >= 0) playSong(podcastReturnIndex);
     }
-    return;
-  }
-  var fallback = audioEl.dataset.mediaFallback;
-  if (fallback) {
-    audioEl.dataset.mediaFallback = '';
-    audioEl.src = fallback;
-    audioEl.load();
     return;
   }
   var nextIdx = nextPlayableIndex(currentIndex + 1);

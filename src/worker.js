@@ -94,8 +94,32 @@ export default {
           if (!mediaUrl && song.tg_video_url) mediaUrl = song.tg_video_url;
           if (!mediaUrl && song.suno_audio_url) mediaUrl = song.suno_audio_url;
           if (!mediaUrl) return err("No media", 404);
-          var resp = new Response(null, { status: 302, headers: { "Location": mediaUrl, "Access-Control-Allow-Origin": "*", "Cache-Control": "no-cache" } });
-          return addSecurityHeaders(resp);
+
+          // Streaming proxy with edge caching
+          var rangeHeader = request.headers.get("Range");
+          var cacheKey = new Request(request.url, { headers: rangeHeader ? { Range: rangeHeader } : {} });
+          var cacheResponse = await caches.default.match(cacheKey);
+          if (cacheResponse) return addSecurityHeaders(cacheResponse);
+
+          var ac = new AbortController();
+          var t = setTimeout(function () { ac.abort(); }, 30000);
+          try {
+            var proxyResp = await fetch(mediaUrl, { headers: rangeHeader ? { Range: rangeHeader } : {}, signal: ac.signal });
+            if (!proxyResp.ok && proxyResp.status !== 206) return addSecurityHeaders(new Response(proxyResp.body, { status: proxyResp.status, headers: { "Access-Control-Allow-Origin": "*" } }));
+
+            var respHeaders = new Headers(proxyResp.headers);
+            respHeaders.set("Access-Control-Allow-Origin", "*");
+            respHeaders.set("Access-Control-Expose-Headers", "*");
+            respHeaders.set("Cache-Control", "public, max-age=31536000, immutable");
+            var response = new Response(proxyResp.body, { status: proxyResp.status, headers: respHeaders });
+
+            // Cache full responses on edge
+            if (!rangeHeader && proxyResp.ok) {
+              response.clone();
+              caches.default.put(cacheKey, new Response(response.body, response));
+            }
+            return addSecurityHeaders(response);
+          } finally { clearTimeout(t); }
         } catch (e) { return err("Media error"); }
       }
 
