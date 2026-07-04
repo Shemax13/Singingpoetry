@@ -1,5 +1,6 @@
 name: Deploy
 
+# Триггер деплоя: пуш в master
 on:
   push:
     branches: [master]
