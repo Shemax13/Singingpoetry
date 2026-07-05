@@ -1,0 +1,38 @@
+name: Setup Telegram Webhook
+on:
+  workflow_dispatch:
+
+jobs:
+  setup:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Setup webhook
+        env:
+          TELEGRAM_BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
+        run: |
+          BASE="https://api.telegram.org/bot${TELEGRAM_BOT_TOKEN}"
+
+          echo "::group::Bot info"
+          ME=$(curl -sf "${BASE}/getMe")
+          echo "$ME" | jq .
+          BOT_USERNAME=$(echo "$ME" | jq -r '.result.username')
+          echo "Bot: @${BOT_USERNAME}"
+          echo "::endgroup::"
+
+          echo "::group::Current webhook status"
+          WH=$(curl -sf "${BASE}/getWebhookInfo")
+          echo "$WH" | jq .
+          echo "::endgroup::"
+
+          echo "::group::Set webhook"
+          WEBHOOK_URL="https://poetry.shemax.workers.dev/api/webhook"
+          RESULT=$(curl -sf -X POST "${BASE}/setWebhook" \
+            -H "Content-Type: application/json" \
+            -d "{\"url\": \"${WEBHOOK_URL}\", \"allowed_updates\": [\"message\", \"channel_post\"]}")
+          echo "$RESULT" | jq .
+          echo "::endgroup::"
+
+          echo "::group::Verify webhook"
+          WH2=$(curl -sf "${BASE}/getWebhookInfo")
+          echo "$WH2" | jq .
+          echo "::endgroup::"
