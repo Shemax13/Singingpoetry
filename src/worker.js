@@ -736,9 +736,9 @@ export default {
       var isAdmin = key.indexOf("admin") !== -1;
       var csp = "default-src 'self'; style-src 'self' 'unsafe-inline'; script-src 'self'" +
         (isAdmin ? " https://challenges.cloudflare.com" : "") +
-        "; img-src 'self' https://api.telegram.org https://cdn2.suno.ai https://poetry.shemax.workers.dev data:;" +
-        " media-src 'self' https://api.telegram.org https://cdn2.suno.ai https://poetry.shemax.workers.dev;" +
-        " connect-src 'self' https://poetry.shemax.workers.dev" +
+        "; img-src 'self' https://api.telegram.org https://cdn1.suno.ai https://cdn2.suno.ai https://poetry.shemax.workers.dev data:;" +
+        " media-src 'self' https://api.telegram.org https://cdn1.suno.ai https://cdn2.suno.ai https://poetry.shemax.workers.dev;" +
+        " connect-src 'self' https://poetry.shemax.workers.dev https://cdn1.suno.ai" +
         (isAdmin ? " https://challenges.cloudflare.com" : "") +
         "; font-src 'self';" +
         (isAdmin ? " frame-src https://challenges.cloudflare.com;" : "");

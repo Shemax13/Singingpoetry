@@ -138,7 +138,17 @@ async function playSong(index) {
   if (videoEl._loadTimeout) clearTimeout(videoEl._loadTimeout);
   if (audioEl._loadTimeout) clearTimeout(audioEl._loadTimeout);
 
-  // Always use proxy for consistent edge caching
+  // Suno CDN audio plays directly (cdn1.suno.ai accessible from browsers, not from Workers proxy)
+  // Telegram media always goes through proxy for edge caching
+  var audioSourceUrl = null;
+  if (hasSunoAudio && !hasVideo) {
+    audioSourceUrl = song.suno_audio_url;
+  } else if (hasPodcastAudio) {
+    audioSourceUrl = API + '/media/' + song.id;
+  } else if (hasVideo) {
+    audioSourceUrl = null; // video handles playback
+  }
+
   var proxyUrl = API + '/media/' + song.id;
 
   // Video
@@ -154,14 +164,8 @@ async function playSong(index) {
   }
 
   // Audio
-  if (hasSunoAudio) {
-    audioEl.src = proxyUrl;
-    audioEl.load();
-    audioEl._loadTimeout = setTimeout(function() {
-      nextSong();
-    }, 60000);
-  } else if (hasPodcastAudio) {
-    audioEl.src = proxyUrl;
+  if (audioSourceUrl) {
+    audioEl.src = audioSourceUrl;
     audioEl.load();
     audioEl._loadTimeout = setTimeout(function() {
       nextSong();
@@ -211,10 +215,11 @@ async function playSong(index) {
 
   // Media Session API
   if ('mediaSession' in navigator) {
+    var artworkUrl = song.cover_url || song.suno_cover_url || '/img/logo.png';
     navigator.mediaSession.metadata = new MediaMetadata({
       title: song.title || '',
       artist: 'Shemaxpoetry',
-      artwork: [{ src: '/img/logo.png', sizes: '512x512', type: 'image/png' }]
+      artwork: [{ src: artworkUrl, sizes: '512x512', type: 'image/png' }]
     });
   }
 
@@ -381,17 +386,26 @@ function preloadNextSong() {
   var next = playerQueue[nextIdx];
   if (!next || next._preloaded) return;
   next._preloaded = true;
-  // Warm edge cache via proxy URL
-  var link = document.createElement('link');
-  link.rel = 'prefetch';
-  link.href = API + '/media/' + next.id;
-  link.as = next.tg_video_url ? 'video' : 'audio';
-  next._preloadLink = link;
-  document.head.appendChild(link);
-  setTimeout(function(){if(link.parentNode)link.parentNode.removeChild(link);}, 10000);
-  // Pre-resolve tg_file_id to warm the getFile cache on the Worker
-  if (next.tg_file_id) {
+  var preloadUrl = null;
+  var preloadAs = 'audio';
+  if (next.tg_video_url) {
+    preloadUrl = API + '/media/' + next.id;
+    preloadAs = 'video';
+  } else if (next.tg_file_id) {
+    preloadUrl = API + '/media/' + next.id;
+    // Pre-resolve tg_file_id to warm the getFile cache on the Worker
     fetch(API + '/tg-file-url/' + next.id).catch(function(){});
+  } else if (next.suno_audio_url) {
+    preloadUrl = next.suno_audio_url;
+  }
+  if (preloadUrl) {
+    var link = document.createElement('link');
+    link.rel = 'prefetch';
+    link.href = preloadUrl;
+    link.as = preloadAs;
+    next._preloadLink = link;
+    document.head.appendChild(link);
+    setTimeout(function(){if(link.parentNode)link.parentNode.removeChild(link);}, 10000);
   }
 }
 
