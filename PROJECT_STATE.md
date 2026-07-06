@@ -5,26 +5,31 @@
 Telegram-бот [@ShemaxPoetryBot](https://t.me/ShemaxPoetryBot) + веб-плеер для стихов/песен.
 Бот постит видео/аудио в канал @shemaxpoetry. Приложение: SPA-плеер на Cloudflare Workers + D1 + KV.
 
-- **Worker URL**: `https://poetry.shemax.workers.dev`
+- **Worker URL** (prod): `https://poetry.shemaxpoetry.workers.dev`
+- **Worker URL** (old): `https://poetry.shemax.workers.dev`
 - **GitHub**: `https://github.com/Shemax13/Singingpoetry`
 - **Бот токен**: `<revoked-see-secrets>`
-- **Account ID**: `a3aa2b215031e097488bb52593789c18`
+- **Account ID**: `02a5ee785952a4e4b7b6da209e10c53d` (Shemax45@gmail.com)
 - **Worker name**: `poetry`
-- **D1 DB**: `SHEMAX_DB` (id: `c139e4fb-afee-4752-978e-f323bbec4aa7`)
-- **KV namespace**: `STATIC` (id: `1994525bead042229fed7f2bd41d2f3a`)
+- **Worker script tag**: `72b3b6c81f7d44b590e56d41f6c75eed`
+- **D1 DB**: `SHEMAX_DB` (id: `9f979733-d291-4e4a-af29-7cb463ca534a`)
+- **KV namespace**: `STATIC` (id: `fd50e45d91a6485b944e69056960dccd`)
 - **Формат**: ES Module (`export default { async fetch(request, env) {...} }`)
-- **Compatibility date**: `2026-06-17`, флаг `nodejs_compat`
+- **Compatibility date**: `2026-07-04`, флаг `nodejs_compat`
+- **API токен**: `cfoat_g2v95oseWcV1V3A5oHG32t6-KVNF1IOOy0Pd3BvOxGY.5nfuPesjyvocXqk8sBwq0nklPsNcouqQC_Ll8_Nqos8`
 
 ---
 
 ## Secrets (Cloudflare Workers)
 
-| Name | Type | Value |
-|------|------|-------|
-| `TELEGRAM_BOT_TOKEN` | secret_text | `<revoked-set-in-cf-secrets>` |
-| `ADMIN_PASSWORD` | secret_text | `<revoked-set-in-cf-secrets>` |
+| Name | Type | Value | Status |
+|------|------|-------|--------|
+| `TELEGRAM_BOT_TOKEN` | secret_text | `<revoked-set-in-cf-secrets>` | ✅ установлен |
+| `ADMIN_PASSWORD` | secret_text | `<revoked-set-in-cf-secrets>` | ✅ установлен |
+| `TURNSTILE_SECRET_KEY` | secret_text | `<revoked-set-in-cf-secrets>` | ✅ установлен |
+| `WEBHOOK_SECRET` | secret_text | — | ❌ не установлен (код работает без него) |
 
-`WEBHOOK_SECRET` не установлен — код теперь обрабатывает это: если undefined, проверка пропускается (webhook работает без секрета).
+`WEBHOOK_SECRET` не установлен — код обрабатывает это: если undefined, проверка пропускается (webhook работает без секрета).
 
 ---
 
@@ -36,7 +41,6 @@ Telegram-бот [@ShemaxPoetryBot](https://t.me/ShemaxPoetryBot) + веб-пле
 - `GET /api/songs/:id/next` — следующая песня (циклически)
 - `GET /api/song/:id/podcasts` — подкасты для песни
 - `GET /api/media/:id` — **302 редирект** на актуальный Telegram file URL (через getFile). Если getFile не удался — fallback на tg_video_url/suno_audio_url
-- `GET /api/tg-file-url/:id` — актуальный Telegram file URL (JSON)
 
 ### Webhook (Telegram)
 - `POST /api/webhook?secret=...` — приём обновлений от Telegram (секрет проверяется, но WEBHOOK_SECRET не установлен → всегда ok)
@@ -91,7 +95,7 @@ Browser → poetry.shemax.workers.dev
 
 ## Cron
 
-`0 6 * * *` — ежедневная синхронизация Suno (scheduled handler):
+`0 8 * * *` — ежедневная синхронизация Suno (scheduled handler):
 - Ищет песни с `suno_track_url` но без `suno_audio_url`
 - Ищет песни с suno-ссылками в lyrics
 
@@ -667,3 +671,58 @@ Batch resolve tg_file_id (24.06.2026):
 | `public/index.html` | 5 (🔗 button, links popup) |
 | `public/css/style.css` | 5 (links popup styles) |
 | `wrangler.jsonc` | 2 (cron 08:00) |
+
+---
+
+## CI/CD (Workers Builds)
+
+**Способ деплоя**: Workers Builds через Dashboard Cloudflare.
+
+**Настройки в Dashboard:**
+- Репозиторий: `Shemax13/Singingpoetry`
+- Ветка: `master`
+- Deploy command: `npx wrangler deploy`
+- Build command: (пусто)
+- Root directory: `/`
+
+**Процесс деплоя** (автоматический при push в `master`):
+1. `npm clean-install` (установка зависимостей)
+2. `npx wrangler deploy` (деплой Worker + triggers)
+3. URL: `https://poetry.shemaxpoetry.workers.dev`
+4. Крон: `0 8 * * *`
+
+**Критическое ограничение** — API-лимит 25KB на PUT:
+- Прямая загрузка через `PUT /workers/scripts/{name}` (деплой через API) **таймаутится** при размере тела >25KB
+- Source ~20KB → успех (~2.7s), source ~25KB+ → timeout
+- Workers Builds **обходит** этот лимит, т.к. сборка происходит внутри Cloudflare
+- Source после Workers Builds: 81.16 KiB raw / 16.57 KiB gzip
+
+**Старый deploy.mjs** — работает только для маленьких изменений (<20KB). Для полного деплоя — только Workers Builds.
+
+---
+
+## Security Fixes Applied (06.07.2026)
+
+- **Content-Security-Policy** заголовки на всех ответах
+- **`X-Frame-Options: DENY`** защита от clickjacking
+- **`X-Content-Type-Options: nosniff`**
+- **`Referrer-Policy: strict-origin-when-cross-origin`**
+- **`/api/privacy`** endpoint — политика конфиденциальности
+- **`tg_file_id`** удалён из публичного API (оставлен только `tg_video_url`)
+- **Эндпоинт `/api/tg-file-url/:id`** удалён
+- **Rate limiter** — in-memory ограничение частоты запросов
+- **Все админ роуты** сохранены (за auth)
+- **Webhook** сохранён
+- **Крон** сохранён (0 8 * * *)
+
+---
+
+## API Upload Limit (важно!)
+
+При деплое через Cloudflare API (`PUT /workers/scripts/{name}`):
+- **≤20KB** → успех (~2.7s)
+- **≥25KB** → timeout (25KB PUT body timeout, не сеть/клиент, а сам API)
+
+**Фикс**: Workers Builds (CI/CD) — деплой происходит внутри Cloudflare, лимит отсутствует.
+
+---

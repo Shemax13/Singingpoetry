@@ -2,7 +2,16 @@
 
 ## Проект
 Telegram-бот [@ShemaxPoetryBot](https://t.me/ShemaxPoetryBot) + веб-плеер для стихов/песен.
-Сайт: https://poetry.shemax.workers.dev
+Сайт: https://poetry.shemaxpoetry.workers.dev
+
+## Аккаунты (ВАЖНО!)
+
+**Основной аккаунт (рабочий):** `02a5ee785952a4e4b7b6da209e10c53d` (Shemax45@gmail.com)
+- Worker `poetry`, D1 `SHEMAX_DB`, KV `STATIC` — всё здесь
+- 453 песни, всё работает
+
+**Не путать с:** `a3aa2b215031e097488bb52593789c18` (Shemax@mail.ru)
+- Там пустой аккаунт, worker `poetry` есть, но без данных
 
 ## Текущее состояние
 
@@ -10,10 +19,12 @@ Telegram-бот [@ShemaxPoetryBot](https://t.me/ShemaxPoetryBot) + веб-пле
 - Плеер на сайте, переключение треков, фильтрация, язык (ru/en)
 - Админка: вход, CRUD песен, синхронизация, сканирование канала, плеер в модале
 - Telegram webhook — бот принимает новые посты и создаёт/обновляет песни
-- Cron: ежедневная синхронизация Suno в 6:00 UTC
+- Cron: ежедневная синхронизация Suno в 8:00 UTC
 - Фильтр mp4-only в админке (по умолчанию), кнопка переключения
+- Security headers (CSP, X-Frame-Options, X-Content-Type-Options, Referrer-Policy)
+- Rate limiter на API
 
-### Что починено (июнь 2026)
+### Что починено (июнь-июль 2026)
 - Inline override плеера в admin/index.html — openPlayer, cp(), aliases lP/ce/se/sPS
 - Cover URL overwrite bug — editCoverUrl и editSunoCoverUrl теперь независимы
 - all parseInt() с radix-10 (28 вызовов в 3 файлах)
@@ -23,10 +34,12 @@ Telegram-бот [@ShemaxPoetryBot](https://t.me/ShemaxPoetryBot) + веб-пле
 - resolvedMediaUrl TTL — stale-кэш чистится (delete), не висит мёртвым грузом
 - Background refresh в app.js — загружает ВСЕ песни (было только 100)
 - Media preload — prefetch реального URL вместо 302 redirect
+- Security: CSP headers, `/api/privacy`, `tg_file_id` скрыт из публичного API
+- `/api/tg-file-url/:id` — удалён
 
 ### Архитектура
 ```
-Browser → poetry.shemax.workers.dev
+Browser → poetry.shemaxpoetry.workers.dev
   ├── /api/* → Worker (D1 DB + Telegram API)
   ├── /* → KV (STATIC): index.html, js/, css/
   └── /admin/index.html → KV (admin панель)
@@ -38,44 +51,68 @@ Browser → poetry.shemax.workers.dev
 - order_index 1-452, сортировка по telegram_message_id ASC
 - Telegram message ids: 6–524
 
-### Деплой
+### Инфраструктура
+| Ресурс | ID | Название |
+|--------|----|----------|
+| Account | `02a5ee785952a4e4b7b6da209e10c53d` | Shemax45@gmail.com |
+| Worker | `poetry` | script_tag: `72b3b6c81f7d44b590e56d41f6c75eed` |
+| D1 DB | `9f979733-d291-4e4a-af29-7cb463ca534a` | SHEMAX_DB |
+| KV | `fd50e45d91a6485b944e69056960dccd` | STATIC |
+| API Token | `cfoat_g2v95oseWcV1V3A5oHG32t6-KVNF1IOOy0Pd3BvOxGY.5nfuPesjyvocXqk8sBwq0nklPsNcouqQC_Ll8_Nqos8` | — |
+
+### Secrets (установлены)
+- `TELEGRAM_BOT_TOKEN` ✅
+- `ADMIN_PASSWORD` ✅
+- `TURNSTILE_SECRET_KEY` ✅
+- `WEBHOOK_SECRET` ❌ (не обязателен — код работает без него)
+
+## Деплой
+
+### Основной способ: Workers Builds (рекомендуется)
+Push в `master` → авто-деплой через Dashboard Cloudflare:
 ```bash
-# Worker
+git add -A && git commit -m "message" && git push
+```
+Deploy command: `npx wrangler deploy` (без build-команды)
+Source: 81.16 KiB raw / 16.57 KiB gzip
+
+### Запасной способ: через deploy.mjs (только для source ≤20KB)
+```bash
 node deploy.mjs   # требует CLOUDFLARE_API_TOKEN
-
-# Static в KV
-npx wrangler kv key put --namespace-id 1994525bead042229fed7f2bd41d2f3a <key> --path <file> --remote
-
-# Миграции D1
-npm run migrate
-
-# Секреты
-TELEGRAM_BOT_TOKEN, ADMIN_PASSWORD, WEBHOOK_SECRET
+# ВНИМАНИЕ: PUT лимит 25KB — таймаут при source ≥25KB!
 ```
 
-### Проблемы сети
-- upload >24KB зависает на этой машине (wrangler + прямой API)
-- GitHub Actions deploy — настроен, но не проверен после последних коммитов
-- В `deploy.yml` есть job `deploy-static` для 6 файлов KV
+### Static в KV
+```bash
+npx wrangler kv key put --namespace-id fd50e45d91a6485b944e69056960dccd <key> --path <file> --remote
+```
 
-### Что дальше
-1. [ ] **Задеплоить worker.js** (safeJSON, getPublicSong, parseInt, sync fix, import-channel fix) — через GitHub Actions или с другого соединения
-2. [ ] **Задеплоить admin.js** (cover URL fix, saveEdit error handling, parseInt) — в KV
-3. [ ] **Задеплоить app.js** (chunk 100, full background refresh, preload, resolvedMediaUrl fix) — в KV
-4. [ ] **Выполнить миграцию** `npm run migrate` (005_add_indexes.sql — 4 индекса)
-5. [ ] **Push на GitHub** — все локальные изменения не в git
-6. [ ] **Проверить GitHub Actions** — отключить Workers Builds в Dashboard, если конфликтует
-7. [ ] **Проставить названия** — 0 Untitled (готово), но проверить новые песни
-8. [ ] **Подкасты** — audio_breakdowns не синхронизированы с новыми песнями
+### Миграции D1
+```bash
+npm run migrate
+```
 
-### Контакты
-- Worker: poetry
-- Account: a3aa2b215031e097488bb52593789c18
-- D1: c139e4fb-afee-4752-978e-f323bbec4aa7
-- KV: 1994525bead042229fed7f2bd41d2f3a
+## Важные ограничения
+- **API PUT лимит 25KB**: прямой деплой через Cloudflare API таймаутится при source >25KB
+- **Workers Builds обходит лимит**: сборка внутри Cloudflare, лимита нет
+- Workers Builds использует `wrangler.jsonc` для bindings и account_id
+- После деплоя через Workers Builds URL меняется на `https://poetry.shemaxpoetry.workers.dev`
 
-### Важно
-- В админке показываются ТОЛЬКО песни с mp4 (tg_video_url). Остальные скрыты.
-- Порядок песен = порядок в Telegram канале (по возрастанию telegram_message_id)
-- app.js содержит кэш localStorage (30 мин TTL), stale resolvedMediaUrl чистится автоматически
-- При переключении в новый чат: скопировать HANDOVER.md + PROJECT_STATE.md + deploy.yml
+## Security (06.07.2026)
+- Content-Security-Policy headers
+- X-Frame-Options: DENY
+- X-Content-Type-Options: nosniff
+- Referrer-Policy: strict-origin-when-cross-origin
+- `/api/privacy` endpoint
+- `tg_file_id` скрыт из публичного API
+- Rate limiter
+
+## Что дальше
+1. [ ] Проверить новые песни после деплоя
+2. [ ] Подкасты — audio_breakdowns не синхронизированы с новыми песнями
+3. [ ] Дальнейшие этапы по shemaxplan.md
+
+## Контакты
+- Worker: poetry (account 02a5ee...)
+- URL: https://poetry.shemaxpoetry.workers.dev
+- GitHub: https://github.com/Shemax13/Singingpoetry

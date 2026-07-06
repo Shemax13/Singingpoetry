@@ -100,14 +100,18 @@ id, song_id, title, file_url, duration, telegram_message_id, visible
 
 ### 1.4 Инфраструктура
 
-- Worker: poetry (ES Module, compatibility_date 2026-06-17, nodejs_compat)
-- D1: SHEMAX_DB (id: c139e4fb-afee-4752-978e-f323bbec4aa7)
-- KV: STATIC (id: 1994525bead042229fed7f2bd41d2f3a) — фронтенд
-- R2: shemaxpoetry — создан, пустой
-- Queue: shemax-uploads — создана, пустая
-- Account: a3aa2b215031e097488bb52593789c18
-- Repo: github.com/Shemax13/Singingpoetry
-- Деплой: node deploy.mjs (curl API, т.к. wrangler deploy висит)
+- **Account ID**: `02a5ee785952a4e4b7b6da209e10c53d` (Shemax45@gmail.com) — **основной**
+  - (Не путать с `a3aa2b215031e097488bb52593789c18` — Shemax@mail.ru, там пустой аккаунт)
+- **Worker**: poetry (ES Module, compatibility_date 2026-07-04, nodejs_compat, script_tag: `72b3b6c81f7d44b590e56d41f6c75eed`)
+- **Worker URL**: `https://poetry.shemaxpoetry.workers.dev`
+- **D1**: SHEMAX_DB (id: `9f979733-d291-4e4a-af29-7cb463ca534a`) — 453 песни
+- **KV**: STATIC (id: `fd50e45d91a6485b944e69056960dccd`) — фронтенд
+- **R2**: shemaxpoetry — создан, пустой
+- **Queue**: shemax-uploads — создана, пустая
+- **API Token**: `cfoat_g2v95oseWcV1V3A5oHG32t6-KVNF1IOOy0Pd3BvOxGY.5nfuPesjyvocXqk8sBwq0nklPsNcouqQC_Ll8_Nqos8`
+- **Repo**: github.com/Shemax13/Singingpoetry
+- **Деплой**: Workers Builds (Dashboard) — авто при push в `master`
+- **Secrets**: `TELEGRAM_BOT_TOKEN`, `ADMIN_PASSWORD`, `TURNSTILE_SECRET_KEY` — установлены. `WEBHOOK_SECRET` — не установлен (код работает без него)
 
 ---
 
@@ -824,12 +828,13 @@ INSERT INTO cross_post_config VALUES (...pre-populated 5 platforms...);
 
 ### Существующие
 
-| Secret | Назначение |
-|--------|------------|
-| TELEGRAM_BOT_TOKEN | Токен бота @ShemaxPoetryBot |
-| ADMIN_PASSWORD | Пароль для входа в админку |
-| TURNSTILE_SECRET_KEY | Secret key для Cloudflare Turnstile (из dashboard) |
-| ALERT_CHAT_ID | Telegram chat ID для отправки алертов (мониторинг) |
+| Secret | Назначение | Установлен? |
+|--------|------------|-------------|
+| TELEGRAM_BOT_TOKEN | Токен бота @ShemaxPoetryBot | ✅ |
+| ADMIN_PASSWORD | Пароль для входа в админку | ✅ |
+| TURNSTILE_SECRET_KEY | Secret key для Cloudflare Turnstile (из dashboard) | ✅ |
+| WEBHOOK_SECRET | Секрет для верификации вебхуков | ❌ (не обязателен) |
+| ALERT_CHAT_ID | Telegram chat ID для отправки алертов (мониторинг) | ❌ |
 
 ### Новые (для кросс-постинга)
 
@@ -854,16 +859,17 @@ INSERT INTO cross_post_config VALUES (...pre-populated 5 platforms...);
   "$schema": "https://raw.githubusercontent.com/cloudflare/workers-sdk/main/packages/wrangler/config-schema.json",
   "name": "poetry",
   "main": "src/worker.js",
-  "compatibility_date": "2026-06-17",
+  "compatibility_date": "2026-07-04",
   "compatibility_flags": ["nodejs_compat"],
+  "account_id": "02a5ee785952a4e4b7b6da209e10c53d",
   "d1_databases": [{
     "binding": "DB",
     "database_name": "SHEMAX_DB",
-    "database_id": "c139e4fb-afee-4752-978e-f323bbec4aa7"
+    "database_id": "9f979733-d291-4e4a-af29-7cb463ca534a"
   }],
   "kv_namespaces": [{
     "binding": "STATIC",
-    "id": "1994525bead042229fed7f2bd41d2f3a"
+    "id": "fd50e45d91a6485b944e69056960dccd"
   }],
   "r2_buckets": [{
     "binding": "MEDIA",
@@ -874,7 +880,7 @@ INSERT INTO cross_post_config VALUES (...pre-populated 5 platforms...);
     "queue": "shemax-uploads"
   }],
   "triggers": {
-    "crons": ["0 6 * * *", "0 8 * * *"]
+    "crons": ["0 8 * * *"]
   }
 }
 ```
@@ -973,19 +979,25 @@ npm run migrate
 
 ### Шаг 6: Деплой worker
 
+**Основной способ** — Workers Builds (авто при push в `master`):
+```bash
+git add -A && git commit -m "message" && git push
+```
+
+**Запасной способ** — через API (только для source ≤20KB):
 ```bash
 node deploy.mjs
-# Или: npx wrangler deploy
+# ВНИМАНИЕ: PUT лимит 25KB — если source >25KB, команда упадёт с timeout
 ```
 
 ### Шаг 7: Деплой статики
 
 ```bash
 # KV upload для каждого файла
-npx wrangler kv key put --namespace-id 1994525bead042229fed7f2bd41d2f3a \
+npx wrangler kv key put --namespace-id fd50e45d91a6485b944e69056960dccd \
   index.html --path public/index.html --remote
 
-npx wrangler kv key put --namespace-id 1994525bead042229fed7f2bd41d2f3a \
+npx wrangler kv key put --namespace-id fd50e45d91a6485b944e69056960dccd \
   js/app.js --path public/js/app.js --remote
 
 npx wrangler kv key put --namespace-id 1994525bead042229fed7f2bd41d2f3a \
@@ -1431,9 +1443,35 @@ GET /sitemap.xml → Worker route (генерируется из D1: SELECT id, 
 | Типизация | JSDoc-комментарии на экспортируемых функциях | ❌ Не настроено |
 | .editorconfig | `indent_style=space, indent_size=2, charset=utf-8` | ❌ Не настроено |
 
-### 25.2 CI/CD Pipeline (GitHub Actions)
+### 25.2 Workers Builds (CI/CD) — основной способ деплоя
+
+Настроен через Dashboard Cloudflare. **Деплой автоматический при каждом push в `master`.**
+
+| Параметр | Значение |
+|----------|----------|
+| Репозиторий | `Shemax13/Singingpoetry` |
+| Ветка | `master` |
+| Deploy command | `npx wrangler deploy` |
+| Build command | (пусто) |
+| Root directory | `/` |
+
+**Процесс деплоя:**
+1. `npm clean-install` (168 packages, 0 vulnerabilities)
+2. `npx wrangler deploy` → Upload: 81.16 KiB / gzip: 16.57 KiB
+3. Worker Startup Time: 4 ms
+4. URL: `https://poetry.shemaxpoetry.workers.dev`
+5. Schedule: `0 8 * * *`
+
+**Критическое ограничение — API 25KB PUT limit:**
+- Прямой вызов Cloudflare API `PUT /workers/scripts/{name}` таймаутится при >25KB
+- Source ≤20KB → успех (~2.7s), source ≥25KB → timeout
+- Workers Builds **обходит** лимит (сборка внутри Cloudflare)
+
+### 25.3 GitHub Actions Pipeline (запасной способ)
 
 ```yaml
+# ВНИМАНИЕ: deploy.mjs использует CLOUDFLARE_API_TOKEN для прямого PUT
+# Работает только для source ≤20KB. Для полного деплоя — Workers Builds.
 name: CI/CD
 on: [push, pull_request]
 
@@ -1457,7 +1495,7 @@ jobs:
   deploy:
     runs-on: ubuntu-latest
     needs: test
-    if: github.ref == 'refs/heads/main'
+    if: github.ref == 'refs/heads/master'
     steps:
       - uses: actions/checkout@v4
       - run: npm ci
@@ -1466,7 +1504,7 @@ jobs:
           CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
 ```
 
-### 25.3 Pre-commit hooks
+### 25.4 Pre-commit hooks
 
 ```json
 // package.json
@@ -1479,11 +1517,11 @@ jobs:
 }
 ```
 
-### 25.4 Задачи
+### 25.5 Задачи
 
+- [x] Настроить Workers Builds (Dashboard Cloudflare) — основной деплой
 - [ ] Установить и настроить prettier, eslint, editorconfig
 - [ ] Добавить JSDoc на экспортируемые функции в `src/*.js`
-- [ ] Настроить GitHub Actions (lint + test + deploy)
 - [ ] Настроить pre-commit hooks (husky)
 
 ---
