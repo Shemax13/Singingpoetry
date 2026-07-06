@@ -17,6 +17,7 @@ export var corsRestricted = {
 };
 
 var secureHeaders = {
+  "Content-Security-Policy": "default-src 'self'; style-src 'self' 'unsafe-inline'; script-src 'self'; img-src 'self' data:; media-src 'self'; connect-src 'self'; font-src 'self'; frame-ancestors 'none'; form-action 'self'",
   "X-Content-Type-Options": "nosniff",
   "X-Frame-Options": "DENY",
   "Referrer-Policy": "strict-origin-when-cross-origin",
@@ -38,15 +39,6 @@ export function err(s, c) {
 
 export function htmlResponse(body, s) {
   return new Response(body, { status: s || 200, headers: Object.assign({ "Content-Type": "text/html; charset=utf-8" }, secureHeaders) });
-}
-
-export function sanitizeError(msg) {
-  if (!msg) return "Internal error";
-  var blocked = ["SQLITE_ERROR", "SQL", "SELECT ", "INSERT ", "UPDATE ", "DELETE ", "DROP ", "ALTER ", "syntax error", "Unexpected token"];
-  for (var i = 0; i < blocked.length; i++) {
-    if (msg.toUpperCase().indexOf(blocked[i].toUpperCase()) !== -1) return "Internal error";
-  }
-  return msg;
 }
 
 export function validateText(val, maxLen, label) {

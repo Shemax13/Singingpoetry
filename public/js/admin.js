@@ -663,7 +663,7 @@ async function loadPodcasts(songId) {
   const container = $('podcastList');
   if (!container) return;
   container.innerHTML = '<span class="text-muted" style="font-size:0.85rem">Loading...</span>';
-  const result = await api('GET', '/admin/songs/' + songId + '/podcasts');
+  const result = await api('GET', '/admin/songs/' + songId + '/extra-audio');
   if (!result.ok || !result.data) { container.innerHTML = ''; return; }
   currentPodcasts = result.data;
   renderPodcasts();
@@ -690,7 +690,7 @@ function renderPodcasts() {
 
 async function detachPodcast(id) {
   if (!confirm('Remove this podcast?')) return;
-  var result = await api('DELETE', '/admin/podcast/' + id);
+  var result = await api('DELETE', '/admin/extra-audio/' + id);
   if (result.ok) {
     currentPodcasts = currentPodcasts.filter(function(p) { return p.id !== id; });
     renderPodcasts();
@@ -700,7 +700,7 @@ async function detachPodcast(id) {
 }
 
 async function attachPodcast(songId, file) {
-  var result = await api('POST', '/admin/attach-podcast', {
+  var result = await api('POST', '/admin/extra-audio', {
     song_id: songId,
     title: file.text_content || 'Podcast',
     file_url: file.file_url,

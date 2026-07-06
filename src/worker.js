@@ -1,4 +1,4 @@
-import { safeJSON, cors, corsRestricted, json, jsonRestricted, err, secureJSON, htmlResponse, genToken, safeInt, isAuth, firstLine, sunoExtractUrls, sunoFetch, processSunoUrl, parseMsgFull, mimeTypes, sanitizeError, validateText, validateInt, rateLimit, rateLimitResponse, RATE_LIMIT_WINDOW } from './utils.js';
+import { safeJSON, cors, corsRestricted, json, jsonRestricted, err, secureJSON, htmlResponse, genToken, safeInt, isAuth, firstLine, sunoExtractUrls, sunoFetch, processSunoUrl, parseMsgFull, mimeTypes, validateText, validateInt, rateLimit, rateLimitResponse, RATE_LIMIT_WINDOW } from './utils.js';
 
 var secureHeaders = {
   "X-Content-Type-Options": "nosniff",
@@ -13,7 +13,18 @@ function addSecurityHeaders(resp) {
   return resp;
 }
 
-var PRIVACY_HTML = '<!DOCTYPE html><html lang="ru"><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1.0"><title>Политика конфиденциальности — Shemaxpoetry</title><style>body{font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,sans-serif;background:#0d0d14;color:#e8e6e3;max-width:720px;margin:0 auto;padding:40px 20px;line-height:1.7}h1{font-family:Georgia,serif;font-weight:400;font-size:1.8rem;margin-bottom:8px}h2{font-family:Georgia,serif;font-weight:400;font-size:1.3rem;margin-top:32px;color:#d4a853}p{margin:12px 0;color:#a8a6a3}a{color:#d4a853;text-decoration:none}ul{color:#a8a6a3;padding-left:20px}li{margin:6px 0}hr{border:none;border-top:1px solid rgba(255,255,255,0.06);margin:32px 0}</style></head><body><h1>Политика конфиденциальности</h1><p>Последнее обновление: ' + new Date().toISOString().split("T")[0] + '</p><hr><h2>Какие данные собираются</h2><ul><li>Сообщения из Telegram-канала @shemaxpoetry и чата @ShemaxPoetryFreeChat (текст, медиафайлы)</li><li>Метаданные о публикациях: дата, тип контента, размер файлов</li><li>Cookie и localStorage для работы плеера (сохранение языка, кеш песен)</li><li>IP-адрес для rate limiting и аналитики использования API</li></ul><h2>Где хранятся данные</h2><ul><li>Cloudflare D1 (база данных) — метаданные песен, сообщений, сессий админа</li><li>Cloudflare KV — кеш getFile-запросов к Telegram API</li><li>Cloudflare R2 (планируется) — медиафайлы для постоянного хранения</li><li>Telegram серверы — оригинальные медиафайлы (через getFile API)</li></ul><h2>Как используются данные</h2><ul><li>Отображение списка песен и плеера на сайте poetry.shemax.workers.dev</li><li>Кросс-постинг на внешние платформы (VK, YouTube, Threads, Rutube) — только после настройки интеграции</li><li>Сбор анонимной аналитики просмотров, лайков, комментариев</li></ul><h2>Передача данных третьим лицам</h2><p>Данные не продаются и не передаются третьим лицам, кроме случаев, предусмотренных законом. Для кросс-постинга данные могут передаваться на платформы VK, YouTube, Threads, Rutube согласно их политикам конфиденциальности.</p><h2>Права пользователей (GDPR / CCPA)</h2><ul><li>Право на доступ к своим данным</li><li>Право на удаление данных — напишите в @ShemaxPoetryFreeChat</li><li>Право на отказ от сбора данных (отказ от использования сайта)</li></ul><h2>Контакты</h2><p>По вопросам конфиденциальности: @ShemaxPoetryFreeChat (Telegram)</p><hr><p style="font-size:0.85rem;text-align:center">Shemaxpoetry &copy; ' + new Date().getFullYear() + '</p></body></html>';
+var PRIVACY_HTML = '<!DOCTYPE html><html lang="ru"><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1.0"><title>Shemaxpoetry — Политика конфиденциальности</title><style>body{font-family:sans-serif;background:#0d0d14;color:#e8e6e3;max-width:720px;margin:0 auto;padding:40px 20px;line-height:1.6}h1{color:#d4a853}h2{color:#d4a853;font-size:1.2rem;margin-top:24px}a{color:#d4a853}</style></head><body><h1>Политика конфиденциальности</h1><p>Последнее обновление: 6 июля 2026</p><h2>1. Какие данные мы собираем</h2><p>— Тексты и медиафайлы (видео, аудио, изображения) из Telegram-канала @shemaxpoetry и связанного чата.<br>— IP-адрес при запросах к сайту (обрабатывается автоматически инфраструктурой Cloudflare).<br>— Данные для входа в админ-панель (пароль, Turnstile-токен) — не хранятся после проверки.</p><h2>2. Как мы используем данные</h2><p>— Для отображения песен, подкастов и сопутствующего контента на сайте poetry.shemax.workers.dev.<br>— Для обеспечения безопасности (rate limiting, защита от ботов).</p><h2>3. Хранение данных</h2><p>— Данные хранятся в Cloudflare D1 (база данных), Cloudflare KV (фронтенд) и Cloudflare R2 (медиафайлы).<br>— Серверы расположены в дата-центрах Cloudflare по всему миру.<br>— Срок хранения: пока сайт функционирует. Для удаления обратитесь к @shemax45 в Telegram.</p><h2>4. Передача данных третьим лицам</h2><p>— Мы не продаём и не передаём данные третьим лицам.<br>— Используется инфраструктура Cloudflare (обработка запросов, хранение).<br>— Медиафайлы могут загружаться с Telegram CDN и GitHub raw.</p><h2>5. Ваши права (GDPR / CCPA)</h2><p>— Право на доступ: запросить копию ваших данных через @shemax45.<br>— Право на удаление: потребовать удаления данных через @shemax45.<br>— Право на исправление: сообщить об ошибках в данных.<br>— Право на ограничение обработки.<br>— Для запросов: @shemax45 в Telegram.</p><h2>6. Файлы cookie</h2><p>— Сайт не использует собственные файлы cookie для отслеживания.<br>— Cloudflare может устанавливать технические cookie (_cfduid и аналоги) в рамках своей инфраструктуры.</p><h2>7. Безопасность</h2><p>— Все соединения защищены HTTPS (TLS 1.2+).<br>— Админ-панель защищена паролем и Cloudflare Turnstile.<br>— Действуют ограничения частоты запросов (rate limiting).</p><h2>8. Контакты</h2><p>По вопросам конфиденциальности: @shemax45 в Telegram.</p></body></html>';
+var GITHUB_RAW = "https://raw.githubusercontent.com/Shemax13/Singingpoetry/master/audio/";
+var PODCAST_URLS = {};
+PODCAST_URLS[394] = GITHUB_RAW + "The thirteenth wave podcast.m4a";
+PODCAST_URLS[390] = GITHUB_RAW + "The thirteenth wave podcast.m4a";
+PODCAST_URLS[228] = GITHUB_RAW + "Грейпфрут.mp3";
+PODCAST_URLS[439] = GITHUB_RAW + "Прогресс_против_безграничной_глупости.m4a";
+PODCAST_URLS[448] = GITHUB_RAW + "Ртуть_от_градусника_до_смертельной_угрозы.m4a";
+PODCAST_URLS[440] = GITHUB_RAW + "Стихотворение_Шейнина_Бесснежная_зима_и_тревога.m4a";
+PODCAST_URLS[226] = GITHUB_RAW + "Как_мир_встречает_Новый_год_от_Испании_до_Японии.m4a";
+PODCAST_URLS[231] = GITHUB_RAW + "Максим_Шейнин_Она_художник_Психологическая_драма_стиха.m4a";
+
 import { db } from './db.js';
 import { tg } from './services.js';
 
@@ -41,11 +52,12 @@ export default {
       var botAPI = tg(TELEGRAM_BOT_TOKEN, STATIC);
       slog("info", "request", { method: method, path: path, requestId: requestId });
 
-      // Rate limit: 100 req/min for public API, 20 req/min for admin, 5 req/min for login
+      // Rate limit: 100 req/min for public API, 20 req/min for admin (aggregate), 5 req/min for login
       var rlKey = request.headers.get("CF-Connecting-IP") || "unknown";
       var isAdminPath = path.startsWith("/api/admin/");
+      var rlScope = path === "/api/admin/login" ? "login" : (isAdminPath ? "admin" : "public");
       var rlMax = path === "/api/admin/login" ? 5 : (isAdminPath ? 20 : 100);
-      var rlResp = rateLimitResponse("rl:" + rlKey + ":" + path, rlMax, RATE_LIMIT_WINDOW);
+      var rlResp = rateLimitResponse("rl:" + rlKey + ":" + rlScope, rlMax, RATE_LIMIT_WINDOW);
       if (rlResp) {
         slog("warn", "rate_limited", { key: rlKey, path: path });
         return rlResp;
@@ -61,8 +73,8 @@ export default {
           safe.push({
             id: s.id, title: s.title, lyrics: s.lyrics, cover_url: s.cover_url,
             suno_cover_url: s.suno_cover_url, tg_video_url: s.tg_video_url,
-            suno_audio_url: s.suno_audio_url, tg_file_id: s.tg_file_id,
-            podcast_count: s.podcast_count, podcast_audio_url: s.podcast_audio_url,
+            suno_audio_url: s.suno_audio_url,
+            podcast_count: s.podcast_count || (PODCAST_URLS[s.id] ? 1 : 0), podcast_audio_url: s.podcast_audio_url || PODCAST_URLS[s.id] || null,
             duration: s.duration, language: s.language, published_at: s.published_at,
             order_index: s.order_index
           });
@@ -73,13 +85,32 @@ export default {
       }
 
       var m = path.match(/^\/api\/songs\/(\d+)$/);
-      if (m && method === "GET") { var song = await d.getPublicSong(parseInt(m[1], 10)); return song ? json({ ok: true, data: song }) : err("Not found", 404); }
+      if (m && method === "GET") {
+        var song = await d.getPublicSong(parseInt(m[1], 10));
+        if (!song) return err("Not found", 404);
+        var safeSong = {
+          id: song.id, title: song.title, lyrics: song.lyrics, cover_url: song.cover_url,
+          suno_cover_url: song.suno_cover_url, tg_video_url: song.tg_video_url,
+          suno_audio_url: song.suno_audio_url,
+          podcast_count: song.podcast_count || (PODCAST_URLS[song.id] ? 1 : 0), podcast_audio_url: song.podcast_audio_url || PODCAST_URLS[song.id] || null,
+          duration: song.duration, language: song.language, published_at: song.published_at,
+          order_index: song.order_index
+        };
+        return json({ ok: true, data: safeSong });
+      }
 
       m = path.match(/^\/api\/songs\/(\d+)\/next$/);
       if (m && method === "GET") { var next = await d.getNextSong(parseInt(m[1], 10)); return next ? json({ ok: true, data: next }) : err("No next", 404); }
 
       m = path.match(/^\/api\/song\/(\d+)\/podcasts$/);
-      if (m && method === "GET") { var ps = await d.getExtraAudio(parseInt(m[1], 10), 'podcast'); return json({ ok: true, data: ps }); }
+      if (m && method === "GET") {
+        var songId = parseInt(m[1], 10);
+        var ps = await d.getExtraAudio(songId, 'podcast');
+        if (!ps.length && PODCAST_URLS[songId]) {
+          ps = [{ id: 0, song_id: songId, title: "Подкаст", file_url: PODCAST_URLS[songId], file_type: "podcast", visible: 1 }];
+        }
+        return json({ ok: true, data: ps });
+      }
 
       m = path.match(/^\/api\/song\/(\d+)\/links$/);
       if (m && method === "GET") { var links = await d.getSongExternalLinks(parseInt(m[1], 10)); return json({ ok: true, data: links }); }
@@ -93,6 +124,7 @@ export default {
           if (song.tg_file_id) { try { var fi = await botAPI.getFile(song.tg_file_id); mediaUrl = botAPI.getFileUrl(fi.file_path); } catch (e) { } }
           if (!mediaUrl && song.tg_video_url) mediaUrl = song.tg_video_url;
           if (!mediaUrl && song.suno_audio_url) mediaUrl = song.suno_audio_url;
+          if (!mediaUrl && (song.podcast_audio_url || PODCAST_URLS[song.id])) mediaUrl = song.podcast_audio_url || PODCAST_URLS[song.id];
           if (!mediaUrl) return err("No media", 404);
 
           // Streaming proxy with edge caching
@@ -109,7 +141,7 @@ export default {
 
             var respHeaders = new Headers(proxyResp.headers);
             respHeaders.set("Access-Control-Allow-Origin", "*");
-            respHeaders.set("Access-Control-Expose-Headers", "*");
+            respHeaders.set("Access-Control-Expose-Headers", "Content-Type, Content-Length, Content-Range, Accept-Ranges");
             respHeaders.set("Cache-Control", "public, max-age=31536000, immutable");
             var response = new Response(proxyResp.body, { status: proxyResp.status, headers: respHeaders });
 
@@ -121,16 +153,6 @@ export default {
             return addSecurityHeaders(response);
           } finally { clearTimeout(t); }
         } catch (e) { return err("Media error"); }
-      }
-
-      m = path.match(/^\/api\/tg-file-url\/(\d+)$/);
-      if (m && method === "GET") {
-        try {
-          var song = await d.getPublicSong(parseInt(m[1], 10));
-          if (!song || !song.tg_file_id) return json({ ok: false, url: null });
-          var fi = await botAPI.getFile(song.tg_file_id);
-          return json({ ok: true, url: botAPI.getFileUrl(fi.file_path) });
-        } catch (e) { return json({ ok: false, url: null }); }
       }
 
       // -- Webhook --
@@ -228,18 +250,16 @@ export default {
       if (method === "POST" && path === "/api/admin/login") {
         var body = await safeJSON(request);
         if (!body || !body.password || typeof body.password !== "string" || body.password.length > 256) return err("Password required", 400);
-        // Optional Turnstile verification
-        if (env.TURNSTILE_SECRET_KEY) {
-          var turnstileToken = body.turnstile_token || "";
-          if (!turnstileToken) return err("CAPTCHA required", 400);
-          var verifyResp = await fetch("https://challenges.cloudflare.com/turnstile/v0/siteverify", {
-            method: "POST",
-            headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({ secret: env.TURNSTILE_SECRET_KEY, response: turnstileToken }),
-          });
-          var verifyData = await verifyResp.json();
-          if (!verifyData.success) return err("CAPTCHA verification failed", 400);
-        }
+        // Turnstile verification (mandatory)
+        var turnstileToken = body.turnstile_token || "";
+        if (!turnstileToken) return err("CAPTCHA required", 400);
+        var verifyResp = await fetch("https://challenges.cloudflare.com/turnstile/v0/siteverify", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ secret: env.TURNSTILE_SECRET_KEY, response: turnstileToken }),
+        });
+        var verifyData = await verifyResp.json();
+        if (!verifyData.success) return err("CAPTCHA verification failed", 400);
         if (body.password === ADMIN_PASSWORD) {
           var token = genToken();
           var exp = new Date(Date.now() + 86400000).toISOString();

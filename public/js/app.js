@@ -43,6 +43,7 @@ async function apiGet(path) {
 }
 
 async function loadSongs() {
+  var CHUNK = 100;
   // Try cache first
   try {
     var cached = localStorage.getItem('songs_cache');
