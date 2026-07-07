@@ -5,8 +5,8 @@
   "account_id": "02a5ee785952a4e4b7b6da209e10c53d",
   "compatibility_date": "2026-07-04",
   "compatibility_flags": ["nodejs_compat"],
-  "d1_databases": [{"binding": "DB", "database_name": "SHEMAX_DB", "database_id": "9f979733-d291-4e4a-af29-7cb463ca534a"}],
+  "d1_databases": [    {"binding": "DB", "database_name": "SHEMAX_DB", "database_id": "9f979733-d291-4e4a-af29-7cb463ca534a"}],
   "workers_dev": true,
-  "kv_namespaces": [{"binding": "STATIC", "id": "fd50e45d91a6485b944e69056960dccd"}],
+  "kv_namespaces": [    {"binding": "STATIC", "id": "fd50e45d91a6485b944e69056960dccd"}],
   "triggers": {"crons": ["0 8 * * *"]}
 }

@@ -1,0 +1,23 @@
+name: Deploy to Old Account
+
+on:
+  push:
+    branches: [master]
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+
+      - name: Deploy to old account
+        run: node deploy.mjs
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.OAUTH_TOKEN_OLD_ACCOUNT }}
+          DEPLOY_ACCOUNT_ID: a3aa2b215031e097488bb52593789c18
+          DEPLOY_D1_ID: c139e4fb-afee-4752-978e-f323bbec4aa7
+          DEPLOY_KV_ID: 67c625a1b9014853b895f8dfc726b1fa

@@ -7,10 +7,10 @@ for (const m of MODULES) {
   SCRIPTS[m] = readFileSync('src/' + m, 'utf8');
 }
 const TOTAL_KB = Object.values(SCRIPTS).reduce((s, c) => s + c.length, 0) / 1024;
-const ACCOUNT_ID = '02a5ee785952a4e4b7b6da209e10c53d';
+const ACCOUNT_ID = process.env.DEPLOY_ACCOUNT_ID || '02a5ee785952a4e4b7b6da209e10c53d';
 const SCRIPT_NAME = 'poetry';
-const D1_ID = '9f979733-d291-4e4a-af29-7cb463ca534a';
-const KV_ID = 'fd50e45d91a6485b944e69056960dccd';
+const D1_ID = process.env.DEPLOY_D1_ID || '9f979733-d291-4e4a-af29-7cb463ca534a';
+const KV_ID = process.env.DEPLOY_KV_ID || 'fd50e45d91a6485b944e69056960dccd';
 const TOKEN = process.env.CLOUDFLARE_API_TOKEN || process.env.CF_API_TOKEN;
 
 if (!TOKEN) {
