@@ -730,6 +730,9 @@ export default {
           } catch (e) { slog("error", "verify_db_error", { error: e.message, requestId: requestId }); return err("Verify error"); }
         }
 
+        if (path === "/api/privacy") {
+          return htmlResponse(PRIVACY_HTML);
+        }
         return err("Not found", 404);
       }
 
@@ -737,7 +740,7 @@ export default {
     }
 
     // Privacy policy
-    if (path === "/api/privacy" || path === "/privacy") {
+    if (path === "/privacy") {
       return htmlResponse(PRIVACY_HTML);
     }
 
