@@ -413,9 +413,7 @@ body.menu-open {
 /* === Menu Dropdown — curtain slide-down === */
 .menu-dropdown {
   position: absolute;
-  top: 0;
-  left: 0;
-  right: 0;
+  inset: 0;
   z-index: 200;
   display: flex;
   flex-direction: column;
