@@ -66,6 +66,7 @@ export default {
       // -- Public API --
       if (method === "GET" && path === "/api/songs") {
         var songs = await d.getSongs(true, safeInt(url.searchParams.get("limit"), 50), safeInt(url.searchParams.get("offset"), 0));
+        var count = await d.getSongsCount(true);
         // Strip internal fields from public response
         var safe = [];
         for (var _si = 0; _si < songs.length; _si++) {
@@ -81,7 +82,7 @@ export default {
           // Warm getFile cache in background (don't block response)
           if (s.tg_file_id) botAPI.getFile(s.tg_file_id).catch(function (e) { slog("error", "getFile_warm_failed", { songId: s.id, error: e.message }); });
         }
-        return json({ ok: true, data: safe });
+        return json({ ok: true, data: safe, count: count });
       }
 
       var m = path.match(/^\/api\/songs\/(\d+)$/);
@@ -122,7 +123,7 @@ export default {
           if (!song) return err("Not found", 404);
           var mediaUrl = null;
           if (song.tg_file_id) { try { var fi = await botAPI.getFile(song.tg_file_id); mediaUrl = botAPI.getFileUrl(fi.file_path); } catch (e) { } }
-          if (!mediaUrl && song.tg_video_url) mediaUrl = song.tg_video_url;
+          if (!mediaUrl && song.tg_video_url && !song.tg_video_url.startsWith("local:")) mediaUrl = song.tg_video_url;
           if (!mediaUrl && song.suno_audio_url) mediaUrl = song.suno_audio_url;
           if (!mediaUrl && (song.podcast_audio_url || PODCAST_URLS[song.id])) mediaUrl = song.podcast_audio_url || PODCAST_URLS[song.id];
           if (!mediaUrl) return err("No media", 404);
@@ -736,7 +737,7 @@ export default {
     }
 
     // Privacy policy
-    if (path === "/privacy") {
+    if (path === "/api/privacy" || path === "/privacy") {
       return htmlResponse(PRIVACY_HTML);
     }
 

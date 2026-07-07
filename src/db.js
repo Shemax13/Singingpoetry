@@ -12,6 +12,10 @@ export function db(e) {
       p.push(l, o);
       return (await e.prepare(q).bind(...p).all()).results || [];
     },
+    async getSongsCount(v) {
+      var r = await e.prepare("SELECT COUNT(*) as c FROM songs" + (v ? " WHERE visible=1" : "")).first();
+      return r ? r.c : 0;
+    },
     async getSong(id) { return await e.prepare("SELECT s.*," + EXTRA_AUDIO_SUBQUERY + " as podcast_audio_url FROM songs s WHERE id=?").bind(id).first() || null; },
     async getPublicSong(id) { return await e.prepare("SELECT s.*," + EXTRA_AUDIO_SUBQUERY + " as podcast_audio_url FROM songs s WHERE id=? AND visible=1").bind(id).first() || null; },
     async getNextSong(id) {
