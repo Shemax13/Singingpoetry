@@ -271,6 +271,11 @@ export default {
         return err("Invalid password", 401);
       }
 
+      // -- Privacy policy (public, no auth) --
+      if (path === "/api/privacy") {
+        return htmlResponse(PRIVACY_HTML);
+      }
+
       // -- Admin routes --
       if (path.startsWith("/api/admin/")) {
         if (!await isAuth(request, DB)) return err("Unauthorized", 401);
@@ -730,9 +735,6 @@ export default {
           } catch (e) { slog("error", "verify_db_error", { error: e.message, requestId: requestId }); return err("Verify error"); }
         }
 
-        if (path === "/api/privacy") {
-          return htmlResponse(PRIVACY_HTML);
-        }
         return err("Not found", 404);
       }
 
