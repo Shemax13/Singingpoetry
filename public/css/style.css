@@ -301,24 +301,26 @@ body.menu-open {
   100% { transform: translateX(-50%); }
 }
 
-/* === Desktop / Tablet landscape: 3 equal 9:16 (phone portrait) screens === */
+/* === Desktop / Tablet landscape: 3 equal screens fill window === */
 @media (min-width: 900px) and (orientation: landscape) {
+  .app-container {
+    padding: 0;
+    gap: 0;
+  }
+
   .main-screen,
   .side-screen {
     aspect-ratio: 9 / 16;
-    width: calc((100vw - 64px - 32px) / 3);
-    max-width: 420px;
-    border-radius: 16px;
+    width: calc(100vw / 3);
+    border-radius: 0;
   }
 
   .main-screen {
     width: 100%;
-    max-width: none;
   }
 
   .center-column {
-    width: calc((100vw - 64px - 32px) / 3);
-    max-width: 420px;
+    width: calc(100vw / 3);
   }
 
   .side-title {
@@ -331,7 +333,7 @@ body.menu-open {
     font-size: 0.75rem;
     text-align: left;
     color: #fff;
-    border-radius: 0 0 16px 16px;
+    border-radius: 0;
   }
 }
 
