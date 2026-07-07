@@ -372,7 +372,7 @@ Batch resolve tg_file_id (24.06.2026):
 
 Файлы в KV (`STATIC`, namespace: `1994525bead042229fed7f2bd41d2f3a`):
 - `index.html` — SPA плеер
-- `js/app.js` — плеер
+- `js/app.js` — плеер (содержит все event listeners — events.js удалён)
 - `js/admin.js` — админка (логика: CRUD, синхронизация, плеер)
 - `css/style.css` — стили
 - `admin/index.html` — страница админки (включает inline override openPlayer)
@@ -714,6 +714,44 @@ Batch resolve tg_file_id (24.06.2026):
 - **Все админ роуты** сохранены (за auth)
 - **Webhook** сохранён
 - **Крон** сохранён (0 8 * * *)
+
+---
+
+## Последние изменения (08.07.2026)
+
+### UI/UX: меню, хамбургер, полноэкранный режим
+
+**Бата: дубликат event listeners (events.js + app.js)**
+- `events.js` и `app.js` оба вешали `click` на `#hamburgerBtn` через `DOMContentLoaded`
+- `toggleMenu()` вызывался дважды: открыть → сразу закрыть
+- Фикс: `events.js` удалён, все слушатели остались в `app.js`
+
+**Хамбургер (редизайн)**
+- Полупрозрачный стеклянный фон (`rgba(255,255,255,0.06)`, `backdrop-filter: blur(8px)`)
+- Граница 1px, скругление 10px
+- Анимация scale при hover/active
+- Три полоски тоньше (1.5px), сглаженная анимация
+
+**Меню: curtain slide-down анимация**
+- Вместо `display: none/block` → `clip-path: polygon(…)` с `transition: 0.5s cubic-bezier`
+- Закрыто: схлопнуто к верхнему краю (`polygon(0 0, 100% 0, 100% 0, 0 0)`)
+- Открыто: полный прямоугольник (`polygon(0 0, 100% 0, 100% 100%, 0 100%)`)
+- `pointer-events: none` в закрытом состоянии, `auto` в открытом
+
+**Три экрана на десктопе: полное заполнение окна**
+- Убраны `padding`, `gap`, `max-width`, `border-radius` в landscape (≥900px)
+- Каждый экран: `width: calc(100vw / 3); height: 100vh` — без полей
+- Убран `aspect-ratio: 9/16` — на 16:9 мониторах экраны были выше окна (640×1138 при 1080p), `overflow: hidden` обрезал верхние 29px (логотип, гамбургер)
+- Медиаконтент использует `object-fit: contain/cover` для корректного отображения
+
+**Развёртывание**
+- Два аккаунта: новый (Workers Builds, account `02a5ee…`) и старый (GitHub Action, account `a3aa2b…`)
+- Пуш в `master` → авто-деплой на оба аккаунта
+- Коммиты: `24d3a5a`, `297c755`, `2ec6115`, `ca1527c`
+
+**Известные проблемы**
+- На ультрашироких мониторах (21:9) боковые экраны могут быть слишком широкими — `height: 100vh` сохраняет пропорции через `object-fit`
+- На мобильных/портретных экранах layout не изменился (media query `(orientation: portrait)`)
 
 ---
 
