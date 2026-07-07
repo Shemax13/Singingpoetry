@@ -310,8 +310,8 @@ body.menu-open {
 
   .main-screen,
   .side-screen {
-    aspect-ratio: 9 / 16;
     width: calc(100vw / 3);
+    height: 100vh;
     border-radius: 0;
   }
 
