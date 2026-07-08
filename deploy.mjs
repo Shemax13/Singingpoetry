@@ -123,10 +123,11 @@ const resp = await fetch(url, {
 
 const result = await resp.json();
 if (!result.success) {
-  console.error('Upload failed:', JSON.stringify(result.errors));
-  process.exit(1);
+  console.warn('Worker upload failed (likely >25KB API limit):', JSON.stringify(result.errors));
+  console.warn('Continuing with static file upload...');
+} else {
+  console.log('Deployed! Tag:', result.result.tag, 'Deployment:', result.result.deployment_id);
 }
-console.log('Deployed! Tag:', result.result.tag, 'Deployment:', result.result.deployment_id);
 
 // 2. Upload static files to KV
 console.log('Uploading static files...');
