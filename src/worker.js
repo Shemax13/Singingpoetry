@@ -71,10 +71,14 @@ export default {
         var safe = [];
         for (var _si = 0; _si < songs.length; _si++) {
           var s = songs[_si];
+          var mediaUrl = null;
+          if (s.tg_video_url && !s.tg_video_url.startsWith('local:')) mediaUrl = s.tg_video_url;
+          else if (s.suno_audio_url) mediaUrl = s.suno_audio_url;
           safe.push({
             id: s.id, title: s.title, lyrics: s.lyrics, cover_url: s.cover_url,
             suno_cover_url: s.suno_cover_url, tg_video_url: s.tg_video_url,
             suno_audio_url: s.suno_audio_url,
+            media_url: mediaUrl,
             podcast_count: s.podcast_count || (PODCAST_URLS[s.id] ? 1 : 0), podcast_audio_url: s.podcast_audio_url || PODCAST_URLS[s.id] || null,
             duration: s.duration, language: s.language, published_at: s.published_at,
             order_index: s.order_index
@@ -89,10 +93,14 @@ export default {
       if (m && method === "GET") {
         var song = await d.getPublicSong(parseInt(m[1], 10));
         if (!song) return err("Not found", 404);
+        var mediaUrl = null;
+        if (song.tg_video_url && !song.tg_video_url.startsWith('local:')) mediaUrl = song.tg_video_url;
+        else if (song.suno_audio_url) mediaUrl = song.suno_audio_url;
         var safeSong = {
           id: song.id, title: song.title, lyrics: song.lyrics, cover_url: song.cover_url,
           suno_cover_url: song.suno_cover_url, tg_video_url: song.tg_video_url,
           suno_audio_url: song.suno_audio_url,
+          media_url: mediaUrl,
           podcast_count: song.podcast_count || (PODCAST_URLS[song.id] ? 1 : 0), podcast_audio_url: song.podcast_audio_url || PODCAST_URLS[song.id] || null,
           duration: song.duration, language: song.language, published_at: song.published_at,
           order_index: song.order_index
@@ -128,31 +136,8 @@ export default {
           if (!mediaUrl && (song.podcast_audio_url || PODCAST_URLS[song.id])) mediaUrl = song.podcast_audio_url || PODCAST_URLS[song.id];
           if (!mediaUrl) return err("No media", 404);
 
-          // Streaming proxy with edge caching
-          var rangeHeader = request.headers.get("Range");
-          var cacheKey = new Request(request.url, { headers: rangeHeader ? { Range: rangeHeader } : {} });
-          var cacheResponse = await caches.default.match(cacheKey);
-          if (cacheResponse) return addSecurityHeaders(cacheResponse);
-
-          var ac = new AbortController();
-          var t = setTimeout(function () { ac.abort(); }, 30000);
-          try {
-            var proxyResp = await fetch(mediaUrl, { headers: rangeHeader ? { Range: rangeHeader } : {}, signal: ac.signal });
-            if (!proxyResp.ok && proxyResp.status !== 206) return addSecurityHeaders(new Response(proxyResp.body, { status: proxyResp.status, headers: { "Access-Control-Allow-Origin": "*" } }));
-
-            var respHeaders = new Headers(proxyResp.headers);
-            respHeaders.set("Access-Control-Allow-Origin", "*");
-            respHeaders.set("Access-Control-Expose-Headers", "Content-Type, Content-Length, Content-Range, Accept-Ranges");
-            respHeaders.set("Cache-Control", "public, max-age=31536000, immutable");
-            var response = new Response(proxyResp.body, { status: proxyResp.status, headers: respHeaders });
-
-            // Cache full responses on edge
-            if (!rangeHeader && proxyResp.ok) {
-              response.clone();
-              caches.default.put(cacheKey, new Response(response.body, response));
-            }
-            return addSecurityHeaders(response);
-          } finally { clearTimeout(t); }
+          var resp = new Response(null, { status: 302, headers: { "Location": mediaUrl, "Access-Control-Allow-Origin": "*", "Cache-Control": "no-cache" } });
+          return addSecurityHeaders(resp);
         } catch (e) { return err("Media error"); }
       }
 

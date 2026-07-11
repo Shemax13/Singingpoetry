@@ -43,7 +43,7 @@ async function apiGet(path) {
 }
 
 async function loadSongs() {
-  var CHUNK = 100;
+  var CHUNK = 50;
   // Try cache first
   try {
     var cached = localStorage.getItem('songs_cache');
@@ -52,15 +52,21 @@ async function loadSongs() {
       if (parsed.data && parsed.data.length && Date.now() - parsed.ts < CACHE_TTL) {
         playerQueue = parsed.data;
         autoPlay();
-        // Refresh in background — load ALL songs
+        // Refresh in background — load ALL songs in parallel
         var allData = [];
         var result = await apiGet('/songs?limit=' + CHUNK);
         if (result.ok && result.data && result.data.length) {
           allData = result.data;
-          for (var off = CHUNK; result.data.length >= CHUNK; off += CHUNK) {
-            result = await apiGet('/songs?limit=' + CHUNK + '&offset=' + off);
-            if (!result.ok || !result.data || !result.data.length) break;
-            allData = allData.concat(result.data);
+          // Fire next chunks in parallel
+          var morePromises = [];
+          for (var off = CHUNK; off < CHUNK + 250; off += CHUNK) {
+            morePromises.push(apiGet('/songs?limit=' + CHUNK + '&offset=' + off));
+          }
+          var results = await Promise.all(morePromises);
+          for (var i = 0; i < results.length; i++) {
+            if (!results[i].ok || !results[i].data || !results[i].data.length) break;
+            allData = allData.concat(results[i].data);
+            if (results[i].data.length < CHUNK) break;
           }
           playerQueue = allData;
           localStorage.setItem('songs_cache', JSON.stringify({ ts: Date.now(), data: allData }));
@@ -74,25 +80,39 @@ async function loadSongs() {
     }
   } catch(e) {}
 
-  // Phase 1: load first 25 songs fast
-  var result = await apiGet('/songs?limit=25');
+  // Phase 1: load first 15 songs fast
+  var result = await apiGet('/songs?limit=15');
   if (!result.ok || !result.data || !result.data.length) return;
   playerQueue = result.data;
   autoPlay();
 
-  // Phase 2: load remaining songs in background
-  loadMoreSongs(25);
+  // Phase 2: load remaining songs in background (parallel)
+  loadMoreSongs(15);
 }
 
 async function loadMoreSongs(offset) {
-  var CHUNK = 100;
+  var CHUNK = 50;
   try {
-    var result = await apiGet('/songs?limit=' + CHUNK + '&offset=' + offset);
-    if (!result.ok || !result.data || !result.data.length) return;
-    playerQueue = playerQueue.concat(result.data);
+    // Fire up to 5 chunks in parallel
+    var offsets = [];
+    for (var off = offset; off < offset + 5 * CHUNK; off += CHUNK) {
+      offsets.push(off);
+    }
+    var results = await Promise.all(offsets.map(function(off) {
+      return apiGet('/songs?limit=' + CHUNK + '&offset=' + off);
+    }));
+    var lastFullIdx = -1;
+    for (var i = 0; i < results.length; i++) {
+      if (!results[i].ok || !results[i].data || !results[i].data.length) break;
+      playerQueue = playerQueue.concat(results[i].data);
+      lastFullIdx = i;
+      if (results[i].data.length < CHUNK) break;
+    }
     try { localStorage.setItem('songs_cache', JSON.stringify({ ts: Date.now(), data: playerQueue })); } catch(e) {}
     if ($('menuDropdown').classList.contains('open')) { renderMenuSongs(); renderMenuQueue(); }
-    if (result.data.length >= CHUNK) loadMoreSongs(offset + CHUNK);
+    if (lastFullIdx >= 0 && results[lastFullIdx].data && results[lastFullIdx].data.length >= CHUNK) {
+      loadMoreSongs(offset + (lastFullIdx + 1) * CHUNK);
+    }
   } catch(e) {}
 }
 
@@ -139,27 +159,28 @@ async function playSong(index) {
   if (videoEl._loadTimeout) clearTimeout(videoEl._loadTimeout);
   if (audioEl._loadTimeout) clearTimeout(audioEl._loadTimeout);
 
-  // Suno CDN audio plays directly (cdn1.suno.ai accessible from browsers, not from Workers proxy)
-  // Telegram media always goes through proxy for edge caching
+  // Use direct media URL when available (faster, bypasses proxy)
+  var directUrl = song.media_url || null;
+  var proxyUrl = API + '/media/' + song.id;
+
+  // Suno CDN audio plays directly
   var audioSourceUrl = null;
   if (hasSunoAudio && !hasVideo) {
-    audioSourceUrl = song.suno_audio_url;
+    audioSourceUrl = directUrl || song.suno_audio_url;
   } else if (hasPodcastAudio) {
     audioSourceUrl = API + '/media/' + song.id;
   } else if (hasVideo) {
     audioSourceUrl = null; // video handles playback
   }
 
-  var proxyUrl = API + '/media/' + song.id;
-
   // Video
   videoEl.style.display = playerMode === 'video' ? 'block' : 'none';
   if (hasVideo) {
-    videoEl.src = proxyUrl;
+    videoEl.src = directUrl || proxyUrl;
     videoEl.load();
     videoEl._loadTimeout = setTimeout(function() {
       nextSong();
-    }, 60000);
+    }, 15000);
   } else {
     videoEl.removeAttribute('src');
   }
@@ -170,7 +191,7 @@ async function playSong(index) {
     audioEl.load();
     audioEl._loadTimeout = setTimeout(function() {
       nextSong();
-    }, 60000);
+    }, 15000);
   } else {
     audioEl.removeAttribute('src');
   }
@@ -389,19 +410,21 @@ function preloadNextSong() {
   next._preloaded = true;
   var preloadUrl = null;
   var preloadAs = 'audio';
-  if (next.tg_video_url) {
+  if (next.media_url) {
+    preloadUrl = next.media_url;
+    preloadAs = next.tg_video_url ? 'video' : 'audio';
+  } else if (next.tg_video_url) {
     preloadUrl = API + '/media/' + next.id;
     preloadAs = 'video';
   } else if (next.tg_file_id) {
     preloadUrl = API + '/media/' + next.id;
-    // Pre-resolve tg_file_id to warm the getFile cache on the Worker
     fetch(API + '/tg-file-url/' + next.id).catch(function(){});
   } else if (next.suno_audio_url) {
     preloadUrl = next.suno_audio_url;
   }
   if (preloadUrl) {
     var link = document.createElement('link');
-    link.rel = 'prefetch';
+    link.rel = 'preload';
     link.href = preloadUrl;
     link.as = preloadAs;
     next._preloadLink = link;
@@ -805,4 +828,5 @@ mainScreen.addEventListener('click', function(e) {
   $('closeTabBtn').addEventListener('click', function() { toggleMenu(); });
   $('linksPopup').addEventListener('click', function(e) { closeLinks(e); });
   $('linksPopupCloseBtn').addEventListener('click', function() { closeLinks(); });
+  $('mainLogo').addEventListener('click', function() { window.open('https://t.me/shemaxpoetry', '_blank'); });
 });

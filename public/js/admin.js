@@ -1,4 +1,4 @@
-const API = 'https://poetry.shemax.workers.dev/api';
+const API = 'https://d5d8a3k77r6d3l9i214a.avjje9e3.apigw.yandexcloud.net/api';
 let token = localStorage.getItem('shemax-admin-token');
 let songs = [];
 let songs2 = [];
@@ -46,15 +46,10 @@ async function handleLogin() {
     $('loginError').classList.remove('hidden');
     return;
   }
-  var turnstileToken = '';
-  if (typeof turnstile !== 'undefined') {
-    try { turnstileToken = turnstile.getResponse(); } catch(e) {}
-    turnstile.reset();
-  }
   const btn = $('loginBtn');
   btn.disabled = true;
   btn.textContent = 'Signing in...';
-  const result = await api('POST', '/admin/login', { password, turnstile_token: turnstileToken });
+  const result = await api('POST', '/admin/login', { password });
   btn.disabled = false;
   btn.textContent = 'Sign In';
   if (result.ok && result.data?.token) {

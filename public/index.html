@@ -3,11 +3,27 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width,initial-scale=1.0,maximum-scale=1.0,user-scalable=no">
-<title>Shemaxpoetry</title>
+<title>Shemaxpoetry — поэтический проект</title>
+<meta name="description" content="Поэтический проект Shemaxpoetry. Оригинальные стихи, аудио- и видеозаписи. Автор — Osintsev (Shemax).">
+<meta name="keywords" content="поэзия, стихи, shemaxpoetry, аудиостихи, поэтический проект">
+<meta name="author" content="Osintsev (Shemax)">
+<meta property="og:title" content="Shemaxpoetry — поэтический проект">
+<meta property="og:description" content="Оригинальные стихи, аудио- и видеозаписи поэтического проекта Shemaxpoetry">
+<meta property="og:image" content="https://shemaxpoetry.website.yandexcloud.net/img/logo.png">
+<meta property="og:url" content="https://shemaxpoetry.website.yandexcloud.net">
+<meta property="og:type" content="website">
+<meta name="twitter:card" content="summary_large_image">
+<meta name="twitter:title" content="Shemaxpoetry — поэтический проект">
+<meta name="twitter:description" content="Оригинальные стихи, аудио- и видеозаписи поэтического проекта Shemaxpoetry">
+<meta name="twitter:image" content="https://shemaxpoetry.website.yandexcloud.net/img/logo.png">
+<meta http-equiv="Content-Security-Policy" content="default-src 'self'; style-src 'self' 'unsafe-inline'; script-src 'self'; img-src 'self' https://api.telegram.org https://cdn1.suno.ai https://cdn2.suno.ai https://poetry.shemax.workers.dev https://d5d8a3k77r6d3l9i214a.avjje9e3.apigw.yandexcloud.net https://shemaxpoetry.website.yandexcloud.net data:; media-src 'self' https://api.telegram.org https://cdn1.suno.ai https://cdn2.suno.ai https://poetry.shemax.workers.dev https://d5d8a3k77r6d3l9i214a.avjje9e3.apigw.yandexcloud.net https://shemaxpoetry.website.yandexcloud.net; connect-src 'self' https://poetry.shemax.workers.dev https://d5d8a3k77r6d3l9i214a.avjje9e3.apigw.yandexcloud.net https://cdn1.suno.ai; font-src 'self';">
 <link rel="icon" href="/img/favicon.ico" sizes="32x32">
 <link rel="preconnect" href="https://api.telegram.org">
+<link rel="preconnect" href="https://cdn1.suno.ai">
 <link rel="preconnect" href="https://cdn2.suno.ai">
-<link rel="preconnect" href="https://poetry.shemax.workers.dev">
+<link rel="preconnect" href="https://d5d8a3k77r6d3l9i214a.avjje9e3.apigw.yandexcloud.net">
+<link rel="preconnect" href="https://storage.yandexcloud.net">
+<link rel="canonical" href="https://shemaxpoetry.website.yandexcloud.net">
 <link rel="stylesheet" href="/css/style.css">
 </head>
 <body>
@@ -27,7 +43,7 @@
       <canvas id="audioViz"></canvas>
       <div class="main-overlay">
         <div class="main-top">
-          <span class="main-logo">Shemax<span>poetry</span></span>
+          <span class="main-logo" id="mainLogo">Shemax<span>poetry</span></span>
           <button class="hamburger" id="hamburgerBtn" aria-label="Menu">
             <span></span><span></span><span></span>
           </button>
@@ -106,9 +122,9 @@
 </div>
 
 <!-- Hidden audio element -->
-<audio id="playerAudio" preload="none"></audio>
+<audio id="playerAudio" preload="metadata"></audio>
 
-<script src="/js/i18n.js"></script>
-<script src="/js/app.js"></script>
+<script>var i18n={ru:{navSongs:'\u041F\u0435\u0441\u043D\u0438',navAbout:'\u041E \u043F\u0440\u043E\u0435\u043A\u0442\u0435',navQueue:'\u041E\u0447\u0435\u0440\u0435\u0434\u044C',aboutTitle:'\u041E \u043F\u0440\u043E\u0435\u043A\u0442\u0435',aboutText:'\u041F\u043E\u044D\u0442\u0438\u0447\u0435\u0441\u043A\u0438\u0439 \u043F\u0440\u043E\u0435\u043A\u0442 Shemaxpoetry',searchPlaceholder:'\u041F\u043E\u0438\u0441\u043A...',allLanguages:'\u0412\u0441\u0435',podcast:'\u041F\u043E\u0434\u043A\u0430\u0441\u0442',externalLinks:'\u0412\u043D\u0435\u0448\u043D\u0438\u0435 \u0441\u0441\u044B\u043B\u043A\u0438',privacy:'\u041F\u043E\u043B\u0438\u0442\u0438\u043A\u0430 \u043A\u043E\u043D\u0444\u0438\u0434\u0435\u043D\u0446\u0438\u0430\u043B\u044C\u043D\u043E\u0441\u0442\u0438'},en:{navSongs:'Songs',navAbout:'About',navQueue:'Queue',aboutTitle:'About',aboutText:'Shemaxpoetry poetic project',searchPlaceholder:'Search...',allLanguages:'All',podcast:'Podcast',externalLinks:'External Links',privacy:'Privacy Policy'}};var currentLang='ru';function getText(key){return i18n[currentLang]?.[key]||i18n.ru[key]||key}function setLang(lang){currentLang=lang;document.documentElement.lang=lang;document.querySelectorAll('[data-i18n]').forEach(function(el){el.textContent=getText(el.dataset.i18n)});document.querySelectorAll('[data-i18n-placeholder]').forEach(function(el){el.placeholder=getText(el.dataset.i18nPlaceholder)});document.querySelectorAll('.lang-toggle').forEach(function(btn){btn.textContent=currentLang==='ru'?'EN':'RU'});localStorage.setItem('shemax-lang',lang)}function initI18n(){var saved=localStorage.getItem('shemax-lang');if(saved)currentLang=saved;setLang(currentLang)}function toggleLang(){setLang(currentLang==='ru'?'en':'ru')}</script>
+<script defer src="/js/app.js"></script>
 </body>
 </html>
