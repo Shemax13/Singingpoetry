@@ -179,7 +179,7 @@ async function playSong(index) {
     videoEl.load();
     videoEl._loadTimeout = setTimeout(function() {
       nextSong();
-    }, 15000);
+    }, 60000);
   } else {
     videoEl.removeAttribute('src');
   }
@@ -190,7 +190,7 @@ async function playSong(index) {
     audioEl.load();
     audioEl._loadTimeout = setTimeout(function() {
       nextSong();
-    }, 15000);
+    }, 60000);
   } else {
     audioEl.removeAttribute('src');
   }
