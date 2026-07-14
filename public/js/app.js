@@ -159,7 +159,7 @@ async function playSong(index) {
   if (videoEl._loadTimeout) clearTimeout(videoEl._loadTimeout);
   if (audioEl._loadTimeout) clearTimeout(audioEl._loadTimeout);
 
-  // Use direct media URL when available (faster, bypasses proxy)
+  // Proxy media through Worker to avoid direct Telegram access issues
   var proxyUrl = API + '/media/' + song.id;
 
   // Suno CDN audio plays directly
@@ -175,7 +175,7 @@ async function playSong(index) {
   // Video
   videoEl.style.display = playerMode === 'video' ? 'block' : 'none';
   if (hasVideo) {
-    videoEl.src = song.tg_video_url || proxyUrl;
+    videoEl.src = proxyUrl;
     videoEl.load();
     videoEl._loadTimeout = setTimeout(function() {
       nextSong();
@@ -410,7 +410,7 @@ function preloadNextSong() {
   var preloadUrl = null;
   var preloadAs = 'audio';
   if (next.tg_video_url) {
-    preloadUrl = next.tg_video_url;
+    preloadUrl = API + '/media/' + next.id;
     preloadAs = 'video';
   } else if (next.tg_file_id) {
     preloadUrl = API + '/media/' + next.id;

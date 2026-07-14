@@ -1,0 +1,26 @@
+openapi: 3.0.0
+info:
+  title: Shemaxpoetry API
+  version: 1.0.0
+x-yc-apigateway:
+  cors:
+    origin: '*'
+    methods: [GET, POST, PUT, DELETE, OPTIONS]
+    headers: ['Content-Type', 'Authorization']
+    maxAge: 86400
+
+paths:
+  /api/{proxy+}:
+    x-yc-apigateway-any-method:
+      summary: Proxy all API requests to Cloud Function
+      x-yc-apigateway-integration:
+        type: cloud_functions
+        function_id: d4ekon25l2n4vv53pu8g
+        tag: $latest
+        service_account_id: ajeg2osee40blor31v36
+      parameters:
+        - name: proxy
+          in: path
+          required: true
+          schema:
+            type: string

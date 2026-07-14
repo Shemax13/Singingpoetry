@@ -136,7 +136,15 @@ export default {
           if (!mediaUrl && (song.podcast_audio_url || PODCAST_URLS[song.id])) mediaUrl = song.podcast_audio_url || PODCAST_URLS[song.id];
           if (!mediaUrl) return err("No media", 404);
 
-          var resp = new Response(null, { status: 302, headers: { "Location": mediaUrl, "Access-Control-Allow-Origin": "*", "Cache-Control": "no-cache" } });
+          // Proxy the content instead of redirecting, so the browser only needs to reach Cloudflare
+          var upstream = await fetch(mediaUrl, { signal: AbortSignal.timeout(60000) });
+          if (!upstream.ok) return err("Media unavailable", 502);
+          var hdrs = { "Access-Control-Allow-Origin": "*", "Cache-Control": "public, max-age=86400" };
+          var ct = upstream.headers.get("Content-Type");
+          if (ct) hdrs["Content-Type"] = ct;
+          var cl = upstream.headers.get("Content-Length");
+          if (cl) hdrs["Content-Length"] = cl;
+          var resp = new Response(upstream.body, { status: 200, headers: hdrs });
           return addSecurityHeaders(resp);
         } catch (e) { return err("Media error"); }
       }
@@ -734,11 +742,12 @@ export default {
     // Static files from KV
     var key = path === "/" ? "index.html" : path.substring(1);
     try {
-      var value = await STATIC.get(key, { type: "stream" });
+      var isText = key.match(/\.(html|css|js|json|svg|txt)$/);
+      var value = await STATIC.get(key, { type: isText ? "text" : "arrayBuffer" });
       if (value === null) {
         if (key.endsWith("/")) key += "index.html";
         else key += "/index.html";
-        value = await STATIC.get(key, { type: "stream" });
+        value = await STATIC.get(key, { type: isText ? "text" : "arrayBuffer" });
         if (value === null) return addSecurityHeaders(new Response("Not found", { status: 404 }));
       }
       var ext = key.substring(key.lastIndexOf("."));
@@ -747,9 +756,9 @@ export default {
       var isAdmin = key.indexOf("admin") !== -1;
       var csp = "default-src 'self'; style-src 'self' 'unsafe-inline'; script-src 'self'" +
         (isAdmin ? " https://challenges.cloudflare.com" : "") +
-        "; img-src 'self' https://api.telegram.org https://cdn1.suno.ai https://cdn2.suno.ai https://poetry.shemax.workers.dev data:;" +
-        " media-src 'self' https://api.telegram.org https://cdn1.suno.ai https://cdn2.suno.ai https://poetry.shemax.workers.dev;" +
-        " connect-src 'self' https://poetry.shemax.workers.dev https://cdn1.suno.ai" +
+        "; img-src 'self' https://api.telegram.org https://cdn1.suno.ai https://cdn2.suno.ai https://poetry.shemax.workers.dev https://shemaxpoetry.website.yandexcloud.net data:;" +
+        " media-src 'self' https://api.telegram.org https://cdn1.suno.ai https://cdn2.suno.ai https://poetry.shemax.workers.dev https://shemaxpoetry.website.yandexcloud.net;" +
+        " connect-src 'self' https://poetry.shemax.workers.dev https://cdn1.suno.ai https://shemaxpoetry.website.yandexcloud.net" +
         (isAdmin ? " https://challenges.cloudflare.com" : "") +
         "; font-src 'self';" +
         (isAdmin ? " frame-src https://challenges.cloudflare.com;" : "");

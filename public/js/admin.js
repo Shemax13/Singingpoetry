@@ -1,4 +1,4 @@
-const API = 'https://d5d8a3k77r6d3l9i214a.avjje9e3.apigw.yandexcloud.net/api';
+const API = 'https://poetry.shemax.workers.dev/api';
 let token = localStorage.getItem('shemax-admin-token');
 let songs = [];
 let songs2 = [];

@@ -66,6 +66,9 @@ async function uploadStatic(dir, prefix) {
 // 1. Deploy worker script (all modules)
 const metadata = JSON.stringify({
   main_module: 'worker.js',
+  compatibility_date: '2026-07-04',
+  compatibility_flags: ['nodejs_compat'],
+  usage_model: 'standard',
   bindings: [
     { name: 'DB', type: 'd1', id: D1_ID },
     { name: 'STATIC', type: 'kv_namespace', namespace_id: KV_ID },

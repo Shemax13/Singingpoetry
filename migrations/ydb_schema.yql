@@ -1,0 +1,115 @@
+-- YDB Schema for Shemaxpoetry
+-- Note: YDB doesn't support AUTO_INCREMENT, FOREIGN KEY, or datetime('now')
+
+CREATE TABLE songs (
+  id Uint64 NOT NULL,
+  telegram_message_id Uint64,
+  title Utf8 NOT NULL DEFAULT "Untitled",
+  lyrics Utf8,
+  tg_video_url Utf8,
+  tg_file_id Utf8,
+  suno_audio_url Utf8,
+  suno_cover_url Utf8,
+  suno_track_url Utf8,
+  cover_url Utf8,
+  published_at Utf8,
+  order_index Int64 NOT NULL DEFAULT 0,
+  visible Bool NOT NULL DEFAULT true,
+  language Utf8 NOT NULL DEFAULT "ru",
+  created_at Utf8 NOT NULL,
+  updated_at Utf8 NOT NULL,
+  suno_title Utf8,
+  description Utf8,
+  r2_video_url Utf8,
+  r2_migratable Bool DEFAULT true,
+  pending_review Bool DEFAULT false,
+  pending_metadata Utf8,
+  metadata_source Utf8 DEFAULT "telegram",
+  PRIMARY KEY (id)
+);
+
+CREATE TABLE messages (
+  id Uint64 NOT NULL,
+  tg_msg_id Uint64 NOT NULL,
+  chat_id Utf8 NOT NULL,
+  chat_type Utf8 NOT NULL DEFAULT "group",
+  msg_type Utf8 NOT NULL DEFAULT "text",
+  text_content Utf8,
+  file_id Utf8,
+  file_unique_id Utf8,
+  file_url Utf8,
+  mime_type Utf8,
+  file_size Uint64,
+  duration Uint64,
+  forward_from_chat_id Utf8,
+  forward_from_msg_id Uint64,
+  reply_to_msg_id Uint64,
+  reply_to_chat_id Utf8,
+  published_at Utf8,
+  created_at Utf8 NOT NULL,
+  cover_file_id Utf8,
+  cover_url Utf8,
+  file_name Utf8,
+  PRIMARY KEY (id)
+);
+
+CREATE TABLE settings (
+  key Utf8 NOT NULL,
+  value Utf8 NOT NULL,
+  PRIMARY KEY (key)
+);
+
+CREATE TABLE admin_sessions (
+  id Utf8 NOT NULL,
+  created_at Utf8 NOT NULL,
+  expires_at Utf8 NOT NULL,
+  PRIMARY KEY (id)
+);
+
+CREATE TABLE extra_audio (
+  id Uint64 NOT NULL,
+  song_id Uint64 NOT NULL,
+  title Utf8,
+  file_url Utf8,
+  r2_key Utf8,
+  file_type Utf8 DEFAULT "podcast",
+  source Utf8 DEFAULT "telegram",
+  telegram_message_id Uint64,
+  duration Uint64,
+  visible Bool DEFAULT true,
+  published_at Utf8,
+  created_at Utf8,
+  updated_at Utf8,
+  PRIMARY KEY (id)
+);
+
+CREATE TABLE external_link_types (
+  id Uint64 NOT NULL,
+  name Utf8 NOT NULL,
+  icon Utf8 DEFAULT "🔗",
+  sort_order Int64 DEFAULT 0,
+  created_at Utf8,
+  PRIMARY KEY (id)
+);
+
+CREATE TABLE song_external_links (
+  id Uint64 NOT NULL,
+  song_id Uint64 NOT NULL,
+  link_type_id Uint64 NOT NULL,
+  url Utf8 NOT NULL,
+  description Utf8,
+  created_at Utf8,
+  PRIMARY KEY (id)
+);
+
+CREATE TABLE metadata_reviews (
+  id Uint64 NOT NULL,
+  song_id Uint64 NOT NULL,
+  field Utf8 NOT NULL,
+  old_value Utf8,
+  new_value Utf8,
+  source Utf8 DEFAULT "suno",
+  status Utf8 DEFAULT "pending",
+  created_at Utf8,
+  PRIMARY KEY (id)
+);
