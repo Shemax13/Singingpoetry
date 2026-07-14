@@ -6,7 +6,7 @@
   "scripts": {
     "dev": "wrangler dev src/worker.js --d1 DB --test-scheduled",
     "deploy:api": "node deploy.mjs",
-    "deploy": "wrangler deploy",
+    "deploy": "wrangler deploy && wrangler kv:key put --binding=STATIC js/app.js --path public/js/app.js",
     "migrate": "wrangler d1 migrations apply SHEMAX_DB",
     "create-db": "wrangler d1 create SHEMAX_DB",
     "test": "vitest run",
@@ -19,5 +19,8 @@
     "prettier": "^3.5.0",
     "vitest": "^3.0.0",
     "wrangler": "^4.105.0"
+  },
+  "dependencies": {
+    "ydb-sdk": "^5.11.1"
   }
 }
