@@ -1,4 +1,4 @@
-const API = 'https://poetry.shemaxpoetry.workers.dev/api';
+const API = 'https://poetry.shemax.workers.dev/api';
 const CACHE_TTL = 1800000;
 
 var playerQueue = [];
@@ -43,7 +43,7 @@ async function apiGet(path) {
 }
 
 async function loadSongs() {
-  var CHUNK = 50;
+  var CHUNK = 15;
   // Try cache first
   try {
     var cached = localStorage.getItem('songs_cache');
@@ -59,7 +59,7 @@ async function loadSongs() {
           allData = result.data;
           // Fire next chunks in parallel
           var morePromises = [];
-          for (var off = CHUNK; off < CHUNK + 250; off += CHUNK) {
+          for (var off = CHUNK; off < CHUNK + 75; off += CHUNK) {
             morePromises.push(apiGet('/songs?limit=' + CHUNK + '&offset=' + off));
           }
           var results = await Promise.all(morePromises);
@@ -91,7 +91,7 @@ async function loadSongs() {
 }
 
 async function loadMoreSongs(offset) {
-  var CHUNK = 50;
+  var CHUNK = 15;
   try {
     // Fire up to 5 chunks in parallel
     var offsets = [];
@@ -160,13 +160,12 @@ async function playSong(index) {
   if (audioEl._loadTimeout) clearTimeout(audioEl._loadTimeout);
 
   // Use direct media URL when available (faster, bypasses proxy)
-  var directUrl = song.media_url || null;
   var proxyUrl = API + '/media/' + song.id;
 
   // Suno CDN audio plays directly
   var audioSourceUrl = null;
   if (hasSunoAudio && !hasVideo) {
-    audioSourceUrl = directUrl || song.suno_audio_url;
+    audioSourceUrl = song.suno_audio_url;
   } else if (hasPodcastAudio) {
     audioSourceUrl = API + '/media/' + song.id;
   } else if (hasVideo) {
@@ -176,7 +175,7 @@ async function playSong(index) {
   // Video
   videoEl.style.display = playerMode === 'video' ? 'block' : 'none';
   if (hasVideo) {
-    videoEl.src = directUrl || proxyUrl;
+    videoEl.src = song.tg_video_url || proxyUrl;
     videoEl.load();
     videoEl._loadTimeout = setTimeout(function() {
       nextSong();
@@ -410,11 +409,8 @@ function preloadNextSong() {
   next._preloaded = true;
   var preloadUrl = null;
   var preloadAs = 'audio';
-  if (next.media_url) {
-    preloadUrl = next.media_url;
-    preloadAs = next.tg_video_url ? 'video' : 'audio';
-  } else if (next.tg_video_url) {
-    preloadUrl = API + '/media/' + next.id;
+  if (next.tg_video_url) {
+    preloadUrl = next.tg_video_url;
     preloadAs = 'video';
   } else if (next.tg_file_id) {
     preloadUrl = API + '/media/' + next.id;
