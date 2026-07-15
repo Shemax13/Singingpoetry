@@ -15,10 +15,12 @@ jobs:
           node-version: 20
       - run: npm ci
 
-      - name: Deploy Worker
-        run: npx wrangler deploy
-        env:
-          CLOUDFLARE_API_TOKEN: ${{ secrets.CF_API_TOKEN }}
+      - name: Build bundle
+        run: npm run build
+
+      - name: Deploy via deployer
+        run: |
+          curl -s "https://poetry-deployer.shemaxpoetry.workers.dev/deploy-from-url?token=${{ secrets.CF_API_TOKEN }}&url=https://raw.githubusercontent.com/Shemax13/Singingpoetry/refs/heads/master/dist/worker-bundle.js"
 
       - name: Set GITHUB_TOKEN secret
         run: |
