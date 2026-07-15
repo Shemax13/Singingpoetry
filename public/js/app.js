@@ -159,7 +159,7 @@ async function playSong(index) {
   if (videoEl._loadTimeout) clearTimeout(videoEl._loadTimeout);
   if (audioEl._loadTimeout) clearTimeout(audioEl._loadTimeout);
 
-  // Proxy media through Worker to avoid direct Telegram access issues
+  // Media proxy URL (worker redirects to Telegram or GitHub raw)
   var proxyUrl = API + '/media/' + song.id;
 
   // Suno CDN audio plays directly
@@ -172,10 +172,10 @@ async function playSong(index) {
     audioSourceUrl = null; // video handles playback
   }
 
-  // Video
+  // Video — try direct tg_video_url first, fallback to proxy
   videoEl.style.display = playerMode === 'video' ? 'block' : 'none';
   if (hasVideo) {
-    videoEl.src = proxyUrl;
+    videoEl.src = song.tg_video_url || proxyUrl;
     videoEl.load();
     videoEl._loadTimeout = setTimeout(function() {
       nextSong();
@@ -395,6 +395,14 @@ function updatePlayBtn() {
 
 videoEl.addEventListener('play', function(){ isPlaying = true; updatePlayBtn(); showPlayBtn(); $('loadingIndicator').classList.add('hidden'); });
 videoEl.addEventListener('pause', function(){ isPlaying = false; updatePlayBtn(); });
+videoEl.addEventListener('error', function() {
+  // If direct tg_video_url failed, retry via worker proxy
+  var song = playerQueue[currentIndex];
+  if (song && videoEl.src !== (API + '/media/' + song.id)) {
+    videoEl.src = API + '/media/' + song.id;
+    videoEl.load();
+  }
+});
 videoEl.addEventListener('waiting', function(){ $('loadingIndicator').classList.remove('hidden'); });
 audioEl.addEventListener('waiting', function(){ $('loadingIndicator').classList.remove('hidden'); });
 audioEl.addEventListener('play', function(){ isPlaying = true; updatePlayBtn(); showPlayBtn(); $('loadingIndicator').classList.add('hidden'); });
@@ -410,7 +418,7 @@ function preloadNextSong() {
   var preloadUrl = null;
   var preloadAs = 'audio';
   if (next.tg_video_url) {
-    preloadUrl = API + '/media/' + next.id;
+    preloadUrl = next.tg_video_url;
     preloadAs = 'video';
   } else if (next.tg_file_id) {
     preloadUrl = API + '/media/' + next.id;
