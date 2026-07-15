@@ -127,8 +127,10 @@ export default {
       m = path.match(/^\/api\/media\/(\d+)$/);
       if (m && method === "GET") {
         try {
-          var song = await d.getPublicSong(parseInt(m[1], 10));
+          var songId = parseInt(m[1], 10);
+          var song = await d.getPublicSong(songId);
           if (!song) return err("Not found", 404);
+
           var mediaUrl = null;
           if (song.tg_file_id) { try { var fi = await botAPI.getFile(song.tg_file_id); mediaUrl = botAPI.getFileUrl(fi.file_path); } catch (e) { } }
           if (!mediaUrl && song.tg_video_url && !song.tg_video_url.startsWith("local:")) mediaUrl = song.tg_video_url;
@@ -136,17 +138,55 @@ export default {
           if (!mediaUrl && (song.podcast_audio_url || PODCAST_URLS[song.id])) mediaUrl = song.podcast_audio_url || PODCAST_URLS[song.id];
           if (!mediaUrl) return err("No media", 404);
 
-          // Proxy the content instead of redirecting, so the browser only needs to reach Cloudflare
-          var upstream = await fetch(mediaUrl, { signal: AbortSignal.timeout(60000) });
-          if (!upstream.ok) return err("Media unavailable", 502);
-          var hdrs = { "Access-Control-Allow-Origin": "*", "Cache-Control": "public, max-age=86400" };
-          var ct = upstream.headers.get("Content-Type");
-          if (ct) hdrs["Content-Type"] = ct;
-          var cl = upstream.headers.get("Content-Length");
-          if (cl) hdrs["Content-Length"] = cl;
-          var resp = new Response(upstream.body, { status: 200, headers: hdrs });
+          // Redirect the browser to the media URL.
+          // The Worker cannot proxy because Cloudflare blocks api.telegram.org from Workers.
+          var resp = new Response(null, { status: 302, headers: { "Location": mediaUrl, "Access-Control-Allow-Origin": "*", "Cache-Control": "no-cache" } });
           return addSecurityHeaders(resp);
         } catch (e) { return err("Media error"); }
+      }
+
+      // -- Upload video to GitHub raw (admin only) --
+      m = path.match(/^\/api\/upload-video\/(\d+)$/);
+      if (m && method === "POST") {
+        if (!await isAuth(request, DB)) return err("Unauthorized", 401);
+        try {
+          var songId = parseInt(m[1], 10);
+          if (!songId) return err("Invalid id", 400);
+          var githubToken = env.GITHUB_TOKEN;
+          if (!githubToken) return err("GitHub token not configured", 503);
+
+          var contentType = request.headers.get("Content-Type") || "video/mp4";
+          if (contentType.length > 100) return err("Invalid content type", 400);
+
+          var extMap = { "mp4": ".mp4", "webm": ".webm", "ogg": ".ogg", "mp3": ".mp3", "mpeg": ".mp3", "m4a": ".m4a" };
+          var ext = ".mp4";
+          for (var c in extMap) { if (contentType.indexOf(c) !== -1) { ext = extMap[c]; break; } }
+
+          var arrayBuffer = await request.arrayBuffer();
+          if (arrayBuffer.byteLength > 50 * 1024 * 1024) return err("File too large (max 50MB)", 400);
+
+          var ghPath = "videos/" + songId + ext;
+          var rawUrl = "https://raw.githubusercontent.com/Shemax13/Singingpoetry/master/" + ghPath;
+
+          var ghResp = await fetch("https://api.github.com/repos/Shemax13/Singingpoetry/contents/" + ghPath, {
+            method: "PUT",
+            headers: { "Authorization": "Bearer " + githubToken, "Content-Type": "application/json", "User-Agent": "shemax-poetry-worker" },
+            body: JSON.stringify({ message: "cache video #" + songId, content: Buffer.from(arrayBuffer).toString('base64') }),
+          });
+
+          var ghResult = await ghResp.json();
+          if (!ghResp.ok) {
+            slog("error", "github_upload_failed", { songId: songId, status: ghResp.status, error: JSON.stringify(ghResult), requestId: requestId });
+            return err("GitHub upload failed");
+          }
+
+          await d.upsertSong({ id: songId, tg_video_url: rawUrl });
+          slog("info", "github_uploaded", { songId: songId, size: arrayBuffer.byteLength, requestId: requestId });
+          return json({ ok: true, data: { url: rawUrl, size: arrayBuffer.byteLength } });
+        } catch (e) {
+          slog("error", "upload_video_error", { error: e.message, requestId: requestId });
+          return err("Upload failed");
+        }
       }
 
       // -- Webhook --
@@ -756,9 +796,9 @@ export default {
       var isAdmin = key.indexOf("admin") !== -1;
       var csp = "default-src 'self'; style-src 'self' 'unsafe-inline'; script-src 'self'" +
         (isAdmin ? " https://challenges.cloudflare.com" : "") +
-        "; img-src 'self' https://api.telegram.org https://cdn1.suno.ai https://cdn2.suno.ai https://poetry.shemax.workers.dev https://shemaxpoetry.website.yandexcloud.net data:;" +
-        " media-src 'self' https://api.telegram.org https://cdn1.suno.ai https://cdn2.suno.ai https://poetry.shemax.workers.dev https://shemaxpoetry.website.yandexcloud.net;" +
-        " connect-src 'self' https://poetry.shemax.workers.dev https://cdn1.suno.ai https://shemaxpoetry.website.yandexcloud.net" +
+        "; img-src 'self' https://api.telegram.org https://cdn1.suno.ai https://cdn2.suno.ai https://poetry.shemax.workers.dev https://shemaxpoetry.website.yandexcloud.net https://raw.githubusercontent.com data:;" +
+        " media-src 'self' https://api.telegram.org https://cdn1.suno.ai https://cdn2.suno.ai https://poetry.shemax.workers.dev https://shemaxpoetry.website.yandexcloud.net https://raw.githubusercontent.com;" +
+        " connect-src 'self' https://poetry.shemax.workers.dev https://cdn1.suno.ai https://shemaxpoetry.website.yandexcloud.net https://raw.githubusercontent.com" +
         (isAdmin ? " https://challenges.cloudflare.com" : "") +
         "; font-src 'self';" +
         (isAdmin ? " frame-src https://challenges.cloudflare.com;" : "");

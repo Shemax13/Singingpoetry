@@ -1,9 +1,9 @@
 name: Deploy
 
-# Триггер деплоя: пуш в master
 on:
   push:
     branches: [master]
+  workflow_dispatch:
 
 jobs:
   deploy:
@@ -13,6 +13,17 @@ jobs:
       - uses: actions/setup-node@v4
         with:
           node-version: 20
-      - run: node deploy.mjs
+      - run: npm ci
+
+      - name: Deploy Worker
+        run: npx wrangler deploy
         env:
-          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CF_API_TOKEN }}
+
+      - name: Set GITHUB_TOKEN secret
+        run: |
+          curl -s -X PUT \
+            "https://api.cloudflare.com/client/v4/accounts/02a5ee785952a4e4b7b6da209e10c53d/workers/scripts/poetry/secrets" \
+            -H "Authorization: Bearer ${{ secrets.CF_API_TOKEN }}" \
+            -H "Content-Type: application/json" \
+            -d '{"name":"GITHUB_TOKEN","text":"${{ secrets.GH_TOKEN }}","type":"secret_text"}'

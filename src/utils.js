@@ -17,7 +17,7 @@ export var corsRestricted = {
 };
 
 var secureHeaders = {
-  "Content-Security-Policy": "default-src 'self'; style-src 'self' 'unsafe-inline'; script-src 'self'; img-src 'self' https://api.telegram.org https://cdn1.suno.ai https://cdn2.suno.ai data:; media-src 'self' https://api.telegram.org https://cdn1.suno.ai https://cdn2.suno.ai; connect-src 'self' https://api.telegram.org https://cdn1.suno.ai; font-src 'self'; frame-ancestors 'none'; form-action 'self'",
+  "Content-Security-Policy": "default-src 'self'; style-src 'self' 'unsafe-inline'; script-src 'self'; img-src 'self' https://api.telegram.org https://cdn1.suno.ai https://cdn2.suno.ai https://raw.githubusercontent.com data:; media-src 'self' https://api.telegram.org https://cdn1.suno.ai https://cdn2.suno.ai https://raw.githubusercontent.com; connect-src 'self' https://api.telegram.org https://cdn1.suno.ai https://raw.githubusercontent.com; font-src 'self'; frame-ancestors 'none'; form-action 'self'",
   "X-Content-Type-Options": "nosniff",
   "X-Frame-Options": "DENY",
   "Referrer-Policy": "strict-origin-when-cross-origin",
