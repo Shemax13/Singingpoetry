@@ -1,3 +1,6 @@
+var __defProp = Object.defineProperty;
+var __name = (target, value) => __defProp(target, "name", { value, configurable: true });
+
 // src/utils.js
 async function safeJSON(req) {
   try {
@@ -6,6 +9,7 @@ async function safeJSON(req) {
     return null;
   }
 }
+__name(safeJSON, "safeJSON");
 var cors = {
   "Access-Control-Allow-Origin": "*",
   "Access-Control-Allow-Methods": "GET,POST,PUT,DELETE,OPTIONS",
@@ -13,7 +17,7 @@ var cors = {
   "Access-Control-Max-Age": "86400"
 };
 var corsRestricted = {
-  "Access-Control-Allow-Origin": "https://poetry.shemax.workers.dev",
+  "Access-Control-Allow-Origin": "https://poetry.shemaxpoetry.workers.dev",
   "Access-Control-Allow-Methods": "GET,POST,PUT,DELETE,OPTIONS",
   "Access-Control-Allow-Headers": "Content-Type,Authorization",
   "Access-Control-Max-Age": "86400"
@@ -29,12 +33,15 @@ var secureHeaders = {
 function json(d, s) {
   return new Response(JSON.stringify(d), { status: s || 200, headers: Object.assign({}, cors, { "Content-Type": "application/json" }, secureHeaders) });
 }
+__name(json, "json");
 function err(s, c) {
   return json({ ok: false, error: s }, c || 500);
 }
+__name(err, "err");
 function htmlResponse(body, s) {
   return new Response(body, { status: s || 200, headers: Object.assign({ "Content-Type": "text/html; charset=utf-8" }, secureHeaders) });
 }
+__name(htmlResponse, "htmlResponse");
 var rateLimitStore = {};
 var RATE_LIMIT_WINDOW = 6e4;
 function rateLimit(key, maxRequests, windowMs) {
@@ -47,15 +54,18 @@ function rateLimit(key, maxRequests, windowMs) {
   entries.push(now);
   return false;
 }
+__name(rateLimit, "rateLimit");
 function rateLimitResponse(key, maxRequests, windowMs) {
   if (rateLimit(key, maxRequests, windowMs)) {
     return err("Too many requests. Try again later.", 429);
   }
   return null;
 }
+__name(rateLimitResponse, "rateLimitResponse");
 function secureJSON(d, s) {
   return new Response(JSON.stringify(d), { status: s || 200, headers: Object.assign({}, corsRestricted, { "Content-Type": "application/json" }, secureHeaders) });
 }
+__name(secureJSON, "secureJSON");
 function genToken() {
   var b = new Uint8Array(32);
   crypto.getRandomValues(b);
@@ -63,20 +73,24 @@ function genToken() {
     return x.toString(16).padStart(2, "0");
   }).join("");
 }
+__name(genToken, "genToken");
 function safeInt(v, d) {
   var n = parseInt(v, 10);
   return isNaN(n) ? d : n;
 }
+__name(safeInt, "safeInt");
 async function isAuth(req, DB) {
   var h = req.headers.get("Authorization");
   if (!h || !h.startsWith("Bearer ")) return false;
   return !!await DB.prepare("SELECT id FROM admin_sessions WHERE id=? AND expires_at>datetime('now')").bind(h.slice(7)).first();
 }
+__name(isAuth, "isAuth");
 function firstLine(caption) {
   if (!caption) return "Untitled";
   var s = caption.split("\n")[0];
   return s ? s.trim() : "Untitled";
 }
+__name(firstLine, "firstLine");
 function sunoExtractUrls(text) {
   if (!text) return [];
   var urls = [];
@@ -89,6 +103,7 @@ function sunoExtractUrls(text) {
   }
   return urls;
 }
+__name(sunoExtractUrls, "sunoExtractUrls");
 var sunoFetchCache = /* @__PURE__ */ new Map();
 var SUNO_CACHE_TTL = 36e5;
 async function sunoFetch(url) {
@@ -108,6 +123,7 @@ async function sunoFetch(url) {
   sunoFetchCache.set(url, { ts: Date.now(), data: result });
   return result;
 }
+__name(sunoFetch, "sunoFetch");
 async function processSunoUrl(url) {
   try {
     var info = await sunoFetch(url);
@@ -117,6 +133,7 @@ async function processSunoUrl(url) {
     return null;
   }
 }
+__name(processSunoUrl, "processSunoUrl");
 function parseMsgFull(update) {
   if (!update) return null;
   var m = update.message || update.channel_post || update;
@@ -190,6 +207,7 @@ function parseMsgFull(update) {
   }
   return result;
 }
+__name(parseMsgFull, "parseMsgFull");
 var mimeTypes = {
   ".html": "text/html",
   ".css": "text/css",
@@ -440,6 +458,7 @@ function db(e) {
     }
   };
 }
+__name(db, "db");
 
 // src/services.js
 function cappedMap(maxSize) {
@@ -458,6 +477,7 @@ function cappedMap(maxSize) {
   };
   return m;
 }
+__name(cappedMap, "cappedMap");
 var mediaCache = cappedMap(500);
 var CACHE_TTL = 6e5;
 function tg(token, kv) {
@@ -509,6 +529,7 @@ function tg(token, kv) {
     }
   };
 }
+__name(tg, "tg");
 
 // src/worker.js
 var secureHeaders2 = {
@@ -522,7 +543,8 @@ function addSecurityHeaders(resp) {
   for (var k in secureHeaders2) resp.headers.set(k, secureHeaders2[k]);
   return resp;
 }
-var PRIVACY_HTML = '<!DOCTYPE html><html lang="ru"><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1.0"><title>Shemaxpoetry \u2014 \u041F\u043E\u043B\u0438\u0442\u0438\u043A\u0430 \u043A\u043E\u043D\u0444\u0438\u0434\u0435\u043D\u0446\u0438\u0430\u043B\u044C\u043D\u043E\u0441\u0442\u0438</title><style>body{font-family:sans-serif;background:#0d0d14;color:#e8e6e3;max-width:720px;margin:0 auto;padding:40px 20px;line-height:1.6}h1{color:#d4a853}h2{color:#d4a853;font-size:1.2rem;margin-top:24px}a{color:#d4a853}</style></head><body><h1>\u041F\u043E\u043B\u0438\u0442\u0438\u043A\u0430 \u043A\u043E\u043D\u0444\u0438\u0434\u0435\u043D\u0446\u0438\u0430\u043B\u044C\u043D\u043E\u0441\u0442\u0438</h1><p>\u041F\u043E\u0441\u043B\u0435\u0434\u043D\u0435\u0435 \u043E\u0431\u043D\u043E\u0432\u043B\u0435\u043D\u0438\u0435: 6 \u0438\u044E\u043B\u044F 2026</p><h2>1. \u041A\u0430\u043A\u0438\u0435 \u0434\u0430\u043D\u043D\u044B\u0435 \u043C\u044B \u0441\u043E\u0431\u0438\u0440\u0430\u0435\u043C</h2><p>\u2014 \u0422\u0435\u043A\u0441\u0442\u044B \u0438 \u043C\u0435\u0434\u0438\u0430\u0444\u0430\u0439\u043B\u044B (\u0432\u0438\u0434\u0435\u043E, \u0430\u0443\u0434\u0438\u043E, \u0438\u0437\u043E\u0431\u0440\u0430\u0436\u0435\u043D\u0438\u044F) \u0438\u0437 Telegram-\u043A\u0430\u043D\u0430\u043B\u0430 @shemaxpoetry \u0438 \u0441\u0432\u044F\u0437\u0430\u043D\u043D\u043E\u0433\u043E \u0447\u0430\u0442\u0430.<br>\u2014 IP-\u0430\u0434\u0440\u0435\u0441 \u043F\u0440\u0438 \u0437\u0430\u043F\u0440\u043E\u0441\u0430\u0445 \u043A \u0441\u0430\u0439\u0442\u0443 (\u043E\u0431\u0440\u0430\u0431\u0430\u0442\u044B\u0432\u0430\u0435\u0442\u0441\u044F \u0430\u0432\u0442\u043E\u043C\u0430\u0442\u0438\u0447\u0435\u0441\u043A\u0438 \u0438\u043D\u0444\u0440\u0430\u0441\u0442\u0440\u0443\u043A\u0442\u0443\u0440\u043E\u0439 Cloudflare).<br>\u2014 \u0414\u0430\u043D\u043D\u044B\u0435 \u0434\u043B\u044F \u0432\u0445\u043E\u0434\u0430 \u0432 \u0430\u0434\u043C\u0438\u043D-\u043F\u0430\u043D\u0435\u043B\u044C (\u043F\u0430\u0440\u043E\u043B\u044C, Turnstile-\u0442\u043E\u043A\u0435\u043D) \u2014 \u043D\u0435 \u0445\u0440\u0430\u043D\u044F\u0442\u0441\u044F \u043F\u043E\u0441\u043B\u0435 \u043F\u0440\u043E\u0432\u0435\u0440\u043A\u0438.</p><h2>2. \u041A\u0430\u043A \u043C\u044B \u0438\u0441\u043F\u043E\u043B\u044C\u0437\u0443\u0435\u043C \u0434\u0430\u043D\u043D\u044B\u0435</h2><p>\u2014 \u0414\u043B\u044F \u043E\u0442\u043E\u0431\u0440\u0430\u0436\u0435\u043D\u0438\u044F \u043F\u0435\u0441\u0435\u043D, \u043F\u043E\u0434\u043A\u0430\u0441\u0442\u043E\u0432 \u0438 \u0441\u043E\u043F\u0443\u0442\u0441\u0442\u0432\u0443\u044E\u0449\u0435\u0433\u043E \u043A\u043E\u043D\u0442\u0435\u043D\u0442\u0430 \u043D\u0430 \u0441\u0430\u0439\u0442\u0435 poetry.shemax.workers.dev.<br>\u2014 \u0414\u043B\u044F \u043E\u0431\u0435\u0441\u043F\u0435\u0447\u0435\u043D\u0438\u044F \u0431\u0435\u0437\u043E\u043F\u0430\u0441\u043D\u043E\u0441\u0442\u0438 (rate limiting, \u0437\u0430\u0449\u0438\u0442\u0430 \u043E\u0442 \u0431\u043E\u0442\u043E\u0432).</p><h2>3. \u0425\u0440\u0430\u043D\u0435\u043D\u0438\u0435 \u0434\u0430\u043D\u043D\u044B\u0445</h2><p>\u2014 \u0414\u0430\u043D\u043D\u044B\u0435 \u0445\u0440\u0430\u043D\u044F\u0442\u0441\u044F \u0432 Cloudflare D1 (\u0431\u0430\u0437\u0430 \u0434\u0430\u043D\u043D\u044B\u0445), Cloudflare KV (\u0444\u0440\u043E\u043D\u0442\u0435\u043D\u0434) \u0438 Cloudflare R2 (\u043C\u0435\u0434\u0438\u0430\u0444\u0430\u0439\u043B\u044B).<br>\u2014 \u0421\u0435\u0440\u0432\u0435\u0440\u044B \u0440\u0430\u0441\u043F\u043E\u043B\u043E\u0436\u0435\u043D\u044B \u0432 \u0434\u0430\u0442\u0430-\u0446\u0435\u043D\u0442\u0440\u0430\u0445 Cloudflare \u043F\u043E \u0432\u0441\u0435\u043C\u0443 \u043C\u0438\u0440\u0443.<br>\u2014 \u0421\u0440\u043E\u043A \u0445\u0440\u0430\u043D\u0435\u043D\u0438\u044F: \u043F\u043E\u043A\u0430 \u0441\u0430\u0439\u0442 \u0444\u0443\u043D\u043A\u0446\u0438\u043E\u043D\u0438\u0440\u0443\u0435\u0442. \u0414\u043B\u044F \u0443\u0434\u0430\u043B\u0435\u043D\u0438\u044F \u043E\u0431\u0440\u0430\u0442\u0438\u0442\u0435\u0441\u044C \u043A @shemax45 \u0432 Telegram.</p><h2>4. \u041F\u0435\u0440\u0435\u0434\u0430\u0447\u0430 \u0434\u0430\u043D\u043D\u044B\u0445 \u0442\u0440\u0435\u0442\u044C\u0438\u043C \u043B\u0438\u0446\u0430\u043C</h2><p>\u2014 \u041C\u044B \u043D\u0435 \u043F\u0440\u043E\u0434\u0430\u0451\u043C \u0438 \u043D\u0435 \u043F\u0435\u0440\u0435\u0434\u0430\u0451\u043C \u0434\u0430\u043D\u043D\u044B\u0435 \u0442\u0440\u0435\u0442\u044C\u0438\u043C \u043B\u0438\u0446\u0430\u043C.<br>\u2014 \u0418\u0441\u043F\u043E\u043B\u044C\u0437\u0443\u0435\u0442\u0441\u044F \u0438\u043D\u0444\u0440\u0430\u0441\u0442\u0440\u0443\u043A\u0442\u0443\u0440\u0430 Cloudflare (\u043E\u0431\u0440\u0430\u0431\u043E\u0442\u043A\u0430 \u0437\u0430\u043F\u0440\u043E\u0441\u043E\u0432, \u0445\u0440\u0430\u043D\u0435\u043D\u0438\u0435).<br>\u2014 \u041C\u0435\u0434\u0438\u0430\u0444\u0430\u0439\u043B\u044B \u043C\u043E\u0433\u0443\u0442 \u0437\u0430\u0433\u0440\u0443\u0436\u0430\u0442\u044C\u0441\u044F \u0441 Telegram CDN \u0438 GitHub raw.</p><h2>5. \u0412\u0430\u0448\u0438 \u043F\u0440\u0430\u0432\u0430 (GDPR / CCPA)</h2><p>\u2014 \u041F\u0440\u0430\u0432\u043E \u043D\u0430 \u0434\u043E\u0441\u0442\u0443\u043F: \u0437\u0430\u043F\u0440\u043E\u0441\u0438\u0442\u044C \u043A\u043E\u043F\u0438\u044E \u0432\u0430\u0448\u0438\u0445 \u0434\u0430\u043D\u043D\u044B\u0445 \u0447\u0435\u0440\u0435\u0437 @shemax45.<br>\u2014 \u041F\u0440\u0430\u0432\u043E \u043D\u0430 \u0443\u0434\u0430\u043B\u0435\u043D\u0438\u0435: \u043F\u043E\u0442\u0440\u0435\u0431\u043E\u0432\u0430\u0442\u044C \u0443\u0434\u0430\u043B\u0435\u043D\u0438\u044F \u0434\u0430\u043D\u043D\u044B\u0445 \u0447\u0435\u0440\u0435\u0437 @shemax45.<br>\u2014 \u041F\u0440\u0430\u0432\u043E \u043D\u0430 \u0438\u0441\u043F\u0440\u0430\u0432\u043B\u0435\u043D\u0438\u0435: \u0441\u043E\u043E\u0431\u0449\u0438\u0442\u044C \u043E\u0431 \u043E\u0448\u0438\u0431\u043A\u0430\u0445 \u0432 \u0434\u0430\u043D\u043D\u044B\u0445.<br>\u2014 \u041F\u0440\u0430\u0432\u043E \u043D\u0430 \u043E\u0433\u0440\u0430\u043D\u0438\u0447\u0435\u043D\u0438\u0435 \u043E\u0431\u0440\u0430\u0431\u043E\u0442\u043A\u0438.<br>\u2014 \u0414\u043B\u044F \u0437\u0430\u043F\u0440\u043E\u0441\u043E\u0432: @shemax45 \u0432 Telegram.</p><h2>6. \u0424\u0430\u0439\u043B\u044B cookie</h2><p>\u2014 \u0421\u0430\u0439\u0442 \u043D\u0435 \u0438\u0441\u043F\u043E\u043B\u044C\u0437\u0443\u0435\u0442 \u0441\u043E\u0431\u0441\u0442\u0432\u0435\u043D\u043D\u044B\u0435 \u0444\u0430\u0439\u043B\u044B cookie \u0434\u043B\u044F \u043E\u0442\u0441\u043B\u0435\u0436\u0438\u0432\u0430\u043D\u0438\u044F.<br>\u2014 Cloudflare \u043C\u043E\u0436\u0435\u0442 \u0443\u0441\u0442\u0430\u043D\u0430\u0432\u043B\u0438\u0432\u0430\u0442\u044C \u0442\u0435\u0445\u043D\u0438\u0447\u0435\u0441\u043A\u0438\u0435 cookie (_cfduid \u0438 \u0430\u043D\u0430\u043B\u043E\u0433\u0438) \u0432 \u0440\u0430\u043C\u043A\u0430\u0445 \u0441\u0432\u043E\u0435\u0439 \u0438\u043D\u0444\u0440\u0430\u0441\u0442\u0440\u0443\u043A\u0442\u0443\u0440\u044B.</p><h2>7. \u0411\u0435\u0437\u043E\u043F\u0430\u0441\u043D\u043E\u0441\u0442\u044C</h2><p>\u2014 \u0412\u0441\u0435 \u0441\u043E\u0435\u0434\u0438\u043D\u0435\u043D\u0438\u044F \u0437\u0430\u0449\u0438\u0449\u0435\u043D\u044B HTTPS (TLS 1.2+).<br>\u2014 \u0410\u0434\u043C\u0438\u043D-\u043F\u0430\u043D\u0435\u043B\u044C \u0437\u0430\u0449\u0438\u0449\u0435\u043D\u0430 \u043F\u0430\u0440\u043E\u043B\u0435\u043C \u0438 Cloudflare Turnstile.<br>\u2014 \u0414\u0435\u0439\u0441\u0442\u0432\u0443\u044E\u0442 \u043E\u0433\u0440\u0430\u043D\u0438\u0447\u0435\u043D\u0438\u044F \u0447\u0430\u0441\u0442\u043E\u0442\u044B \u0437\u0430\u043F\u0440\u043E\u0441\u043E\u0432 (rate limiting).</p><h2>8. \u041A\u043E\u043D\u0442\u0430\u043A\u0442\u044B</h2><p>\u041F\u043E \u0432\u043E\u043F\u0440\u043E\u0441\u0430\u043C \u043A\u043E\u043D\u0444\u0438\u0434\u0435\u043D\u0446\u0438\u0430\u043B\u044C\u043D\u043E\u0441\u0442\u0438: @shemax45 \u0432 Telegram.</p></body></html>';
+__name(addSecurityHeaders, "addSecurityHeaders");
+var PRIVACY_HTML = '<!DOCTYPE html><html lang="ru"><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1.0"><title>Shemaxpoetry \u2014 \u041F\u043E\u043B\u0438\u0442\u0438\u043A\u0430 \u043A\u043E\u043D\u0444\u0438\u0434\u0435\u043D\u0446\u0438\u0430\u043B\u044C\u043D\u043E\u0441\u0442\u0438</title><style>body{font-family:sans-serif;background:#0d0d14;color:#e8e6e3;max-width:720px;margin:0 auto;padding:40px 20px;line-height:1.6}h1{color:#d4a853}h2{color:#d4a853;font-size:1.2rem;margin-top:24px}a{color:#d4a853}</style></head><body><h1>\u041F\u043E\u043B\u0438\u0442\u0438\u043A\u0430 \u043A\u043E\u043D\u0444\u0438\u0434\u0435\u043D\u0446\u0438\u0430\u043B\u044C\u043D\u043E\u0441\u0442\u0438</h1><p>\u041F\u043E\u0441\u043B\u0435\u0434\u043D\u0435\u0435 \u043E\u0431\u043D\u043E\u0432\u043B\u0435\u043D\u0438\u0435: 6 \u0438\u044E\u043B\u044F 2026</p><h2>1. \u041A\u0430\u043A\u0438\u0435 \u0434\u0430\u043D\u043D\u044B\u0435 \u043C\u044B \u0441\u043E\u0431\u0438\u0440\u0430\u0435\u043C</h2><p>\u2014 \u0422\u0435\u043A\u0441\u0442\u044B \u0438 \u043C\u0435\u0434\u0438\u0430\u0444\u0430\u0439\u043B\u044B (\u0432\u0438\u0434\u0435\u043E, \u0430\u0443\u0434\u0438\u043E, \u0438\u0437\u043E\u0431\u0440\u0430\u0436\u0435\u043D\u0438\u044F) \u0438\u0437 Telegram-\u043A\u0430\u043D\u0430\u043B\u0430 @shemaxpoetry \u0438 \u0441\u0432\u044F\u0437\u0430\u043D\u043D\u043E\u0433\u043E \u0447\u0430\u0442\u0430.<br>\u2014 IP-\u0430\u0434\u0440\u0435\u0441 \u043F\u0440\u0438 \u0437\u0430\u043F\u0440\u043E\u0441\u0430\u0445 \u043A \u0441\u0430\u0439\u0442\u0443 (\u043E\u0431\u0440\u0430\u0431\u0430\u0442\u044B\u0432\u0430\u0435\u0442\u0441\u044F \u0430\u0432\u0442\u043E\u043C\u0430\u0442\u0438\u0447\u0435\u0441\u043A\u0438 \u0438\u043D\u0444\u0440\u0430\u0441\u0442\u0440\u0443\u043A\u0442\u0443\u0440\u043E\u0439 Cloudflare).<br>\u2014 \u0414\u0430\u043D\u043D\u044B\u0435 \u0434\u043B\u044F \u0432\u0445\u043E\u0434\u0430 \u0432 \u0430\u0434\u043C\u0438\u043D-\u043F\u0430\u043D\u0435\u043B\u044C (\u043F\u0430\u0440\u043E\u043B\u044C, Turnstile-\u0442\u043E\u043A\u0435\u043D) \u2014 \u043D\u0435 \u0445\u0440\u0430\u043D\u044F\u0442\u0441\u044F \u043F\u043E\u0441\u043B\u0435 \u043F\u0440\u043E\u0432\u0435\u0440\u043A\u0438.</p><h2>2. \u041A\u0430\u043A \u043C\u044B \u0438\u0441\u043F\u043E\u043B\u044C\u0437\u0443\u0435\u043C \u0434\u0430\u043D\u043D\u044B\u0435</h2><p>\u2014 \u0414\u043B\u044F \u043E\u0442\u043E\u0431\u0440\u0430\u0436\u0435\u043D\u0438\u044F \u043F\u0435\u0441\u0435\u043D, \u043F\u043E\u0434\u043A\u0430\u0441\u0442\u043E\u0432 \u0438 \u0441\u043E\u043F\u0443\u0442\u0441\u0442\u0432\u0443\u044E\u0449\u0435\u0433\u043E \u043A\u043E\u043D\u0442\u0435\u043D\u0442\u0430 \u043D\u0430 \u0441\u0430\u0439\u0442\u0435 poetry.shemaxpoetry.workers.dev.<br>\u2014 \u0414\u043B\u044F \u043E\u0431\u0435\u0441\u043F\u0435\u0447\u0435\u043D\u0438\u044F \u0431\u0435\u0437\u043E\u043F\u0430\u0441\u043D\u043E\u0441\u0442\u0438 (rate limiting, \u0437\u0430\u0449\u0438\u0442\u0430 \u043E\u0442 \u0431\u043E\u0442\u043E\u0432).</p><h2>3. \u0425\u0440\u0430\u043D\u0435\u043D\u0438\u0435 \u0434\u0430\u043D\u043D\u044B\u0445</h2><p>\u2014 \u0414\u0430\u043D\u043D\u044B\u0435 \u0445\u0440\u0430\u043D\u044F\u0442\u0441\u044F \u0432 Cloudflare D1 (\u0431\u0430\u0437\u0430 \u0434\u0430\u043D\u043D\u044B\u0445), Cloudflare KV (\u0444\u0440\u043E\u043D\u0442\u0435\u043D\u0434) \u0438 Cloudflare R2 (\u043C\u0435\u0434\u0438\u0430\u0444\u0430\u0439\u043B\u044B).<br>\u2014 \u0421\u0435\u0440\u0432\u0435\u0440\u044B \u0440\u0430\u0441\u043F\u043E\u043B\u043E\u0436\u0435\u043D\u044B \u0432 \u0434\u0430\u0442\u0430-\u0446\u0435\u043D\u0442\u0440\u0430\u0445 Cloudflare \u043F\u043E \u0432\u0441\u0435\u043C\u0443 \u043C\u0438\u0440\u0443.<br>\u2014 \u0421\u0440\u043E\u043A \u0445\u0440\u0430\u043D\u0435\u043D\u0438\u044F: \u043F\u043E\u043A\u0430 \u0441\u0430\u0439\u0442 \u0444\u0443\u043D\u043A\u0446\u0438\u043E\u043D\u0438\u0440\u0443\u0435\u0442. \u0414\u043B\u044F \u0443\u0434\u0430\u043B\u0435\u043D\u0438\u044F \u043E\u0431\u0440\u0430\u0442\u0438\u0442\u0435\u0441\u044C \u043A @shemax45 \u0432 Telegram.</p><h2>4. \u041F\u0435\u0440\u0435\u0434\u0430\u0447\u0430 \u0434\u0430\u043D\u043D\u044B\u0445 \u0442\u0440\u0435\u0442\u044C\u0438\u043C \u043B\u0438\u0446\u0430\u043C</h2><p>\u2014 \u041C\u044B \u043D\u0435 \u043F\u0440\u043E\u0434\u0430\u0451\u043C \u0438 \u043D\u0435 \u043F\u0435\u0440\u0435\u0434\u0430\u0451\u043C \u0434\u0430\u043D\u043D\u044B\u0435 \u0442\u0440\u0435\u0442\u044C\u0438\u043C \u043B\u0438\u0446\u0430\u043C.<br>\u2014 \u0418\u0441\u043F\u043E\u043B\u044C\u0437\u0443\u0435\u0442\u0441\u044F \u0438\u043D\u0444\u0440\u0430\u0441\u0442\u0440\u0443\u043A\u0442\u0443\u0440\u0430 Cloudflare (\u043E\u0431\u0440\u0430\u0431\u043E\u0442\u043A\u0430 \u0437\u0430\u043F\u0440\u043E\u0441\u043E\u0432, \u0445\u0440\u0430\u043D\u0435\u043D\u0438\u0435).<br>\u2014 \u041C\u0435\u0434\u0438\u0430\u0444\u0430\u0439\u043B\u044B \u043C\u043E\u0433\u0443\u0442 \u0437\u0430\u0433\u0440\u0443\u0436\u0430\u0442\u044C\u0441\u044F \u0441 Telegram CDN \u0438 GitHub raw.</p><h2>5. \u0412\u0430\u0448\u0438 \u043F\u0440\u0430\u0432\u0430 (GDPR / CCPA)</h2><p>\u2014 \u041F\u0440\u0430\u0432\u043E \u043D\u0430 \u0434\u043E\u0441\u0442\u0443\u043F: \u0437\u0430\u043F\u0440\u043E\u0441\u0438\u0442\u044C \u043A\u043E\u043F\u0438\u044E \u0432\u0430\u0448\u0438\u0445 \u0434\u0430\u043D\u043D\u044B\u0445 \u0447\u0435\u0440\u0435\u0437 @shemax45.<br>\u2014 \u041F\u0440\u0430\u0432\u043E \u043D\u0430 \u0443\u0434\u0430\u043B\u0435\u043D\u0438\u0435: \u043F\u043E\u0442\u0440\u0435\u0431\u043E\u0432\u0430\u0442\u044C \u0443\u0434\u0430\u043B\u0435\u043D\u0438\u044F \u0434\u0430\u043D\u043D\u044B\u0445 \u0447\u0435\u0440\u0435\u0437 @shemax45.<br>\u2014 \u041F\u0440\u0430\u0432\u043E \u043D\u0430 \u0438\u0441\u043F\u0440\u0430\u0432\u043B\u0435\u043D\u0438\u0435: \u0441\u043E\u043E\u0431\u0449\u0438\u0442\u044C \u043E\u0431 \u043E\u0448\u0438\u0431\u043A\u0430\u0445 \u0432 \u0434\u0430\u043D\u043D\u044B\u0445.<br>\u2014 \u041F\u0440\u0430\u0432\u043E \u043D\u0430 \u043E\u0433\u0440\u0430\u043D\u0438\u0447\u0435\u043D\u0438\u0435 \u043E\u0431\u0440\u0430\u0431\u043E\u0442\u043A\u0438.<br>\u2014 \u0414\u043B\u044F \u0437\u0430\u043F\u0440\u043E\u0441\u043E\u0432: @shemax45 \u0432 Telegram.</p><h2>6. \u0424\u0430\u0439\u043B\u044B cookie</h2><p>\u2014 \u0421\u0430\u0439\u0442 \u043D\u0435 \u0438\u0441\u043F\u043E\u043B\u044C\u0437\u0443\u0435\u0442 \u0441\u043E\u0431\u0441\u0442\u0432\u0435\u043D\u043D\u044B\u0435 \u0444\u0430\u0439\u043B\u044B cookie \u0434\u043B\u044F \u043E\u0442\u0441\u043B\u0435\u0436\u0438\u0432\u0430\u043D\u0438\u044F.<br>\u2014 Cloudflare \u043C\u043E\u0436\u0435\u0442 \u0443\u0441\u0442\u0430\u043D\u0430\u0432\u043B\u0438\u0432\u0430\u0442\u044C \u0442\u0435\u0445\u043D\u0438\u0447\u0435\u0441\u043A\u0438\u0435 cookie (_cfduid \u0438 \u0430\u043D\u0430\u043B\u043E\u0433\u0438) \u0432 \u0440\u0430\u043C\u043A\u0430\u0445 \u0441\u0432\u043E\u0435\u0439 \u0438\u043D\u0444\u0440\u0430\u0441\u0442\u0440\u0443\u043A\u0442\u0443\u0440\u044B.</p><h2>7. \u0411\u0435\u0437\u043E\u043F\u0430\u0441\u043D\u043E\u0441\u0442\u044C</h2><p>\u2014 \u0412\u0441\u0435 \u0441\u043E\u0435\u0434\u0438\u043D\u0435\u043D\u0438\u044F \u0437\u0430\u0449\u0438\u0449\u0435\u043D\u044B HTTPS (TLS 1.2+).<br>\u2014 \u0410\u0434\u043C\u0438\u043D-\u043F\u0430\u043D\u0435\u043B\u044C \u0437\u0430\u0449\u0438\u0449\u0435\u043D\u0430 \u043F\u0430\u0440\u043E\u043B\u0435\u043C \u0438 Cloudflare Turnstile.<br>\u2014 \u0414\u0435\u0439\u0441\u0442\u0432\u0443\u044E\u0442 \u043E\u0433\u0440\u0430\u043D\u0438\u0447\u0435\u043D\u0438\u044F \u0447\u0430\u0441\u0442\u043E\u0442\u044B \u0437\u0430\u043F\u0440\u043E\u0441\u043E\u0432 (rate limiting).</p><h2>8. \u041A\u043E\u043D\u0442\u0430\u043A\u0442\u044B</h2><p>\u041F\u043E \u0432\u043E\u043F\u0440\u043E\u0441\u0430\u043C \u043A\u043E\u043D\u0444\u0438\u0434\u0435\u043D\u0446\u0438\u0430\u043B\u044C\u043D\u043E\u0441\u0442\u0438: @shemax45 \u0432 Telegram.</p></body></html>';
 var GITHUB_RAW = "https://raw.githubusercontent.com/Shemax13/Singingpoetry/master/audio/";
 var PODCAST_URLS = {};
 PODCAST_URLS[394] = GITHUB_RAW + "The thirteenth wave podcast.m4a";
@@ -547,6 +569,7 @@ var worker_default = {
     function slog(level, msg2, data) {
       console.log(JSON.stringify({ service: "poetry", level, msg: msg2, requestId, ts: (/* @__PURE__ */ new Date()).toISOString(), data: data || {} }));
     }
+    __name(slog, "slog");
     if (method === "OPTIONS") return new Response(null, { headers: path.startsWith("/api/admin/") ? corsRestricted : cors });
     if (path.startsWith("/api/")) {
       var d = db(DB);
@@ -930,7 +953,7 @@ var worker_default = {
         if (method === "POST" && path === "/api/admin/setup-webhook") {
           try {
             var tgBase = "https://api.telegram.org/bot" + TELEGRAM_BOT_TOKEN;
-            var whUrl = url.searchParams.get("url") || "https://poetry.shemax.workers.dev/api/webhook";
+            var whUrl = url.searchParams.get("url") || "https://poetry.shemaxpoetry.workers.dev/api/webhook";
             if (whUrl.length > 500) return err("Invalid URL", 400);
             var meResp = await (await fetch(tgBase + "/getMe")).json();
             if (!meResp.ok) return secureJSON({ ok: true, data: { error: "Bot token invalid" } });
@@ -1417,7 +1440,7 @@ var worker_default = {
       var ct = mimeTypes[ext] || "application/octet-stream";
       var isHtml = ext === ".html" || ext === ".htm";
       var isAdmin = key.indexOf("admin") !== -1;
-      var csp = "default-src 'self'; style-src 'self' 'unsafe-inline'; script-src 'self'" + (isAdmin ? " https://challenges.cloudflare.com" : "") + "; img-src 'self' https://api.telegram.org https://cdn1.suno.ai https://cdn2.suno.ai https://poetry.shemax.workers.dev https://shemaxpoetry.website.yandexcloud.net https://raw.githubusercontent.com data:; media-src 'self' https://api.telegram.org https://cdn1.suno.ai https://cdn2.suno.ai https://poetry.shemax.workers.dev https://shemaxpoetry.website.yandexcloud.net https://raw.githubusercontent.com; connect-src 'self' https://poetry.shemax.workers.dev https://cdn1.suno.ai https://shemaxpoetry.website.yandexcloud.net https://raw.githubusercontent.com" + (isAdmin ? " https://challenges.cloudflare.com" : "") + "; font-src 'self';" + (isAdmin ? " frame-src https://challenges.cloudflare.com;" : "");
+      var csp = "default-src 'self'; style-src 'self' 'unsafe-inline'; script-src 'self'" + (isAdmin ? " https://challenges.cloudflare.com" : "") + "; img-src 'self' https://api.telegram.org https://cdn1.suno.ai https://cdn2.suno.ai https://poetry.shemaxpoetry.workers.dev https://shemaxpoetry.website.yandexcloud.net https://raw.githubusercontent.com data:; media-src 'self' https://api.telegram.org https://cdn1.suno.ai https://cdn2.suno.ai https://poetry.shemaxpoetry.workers.dev https://shemaxpoetry.website.yandexcloud.net https://raw.githubusercontent.com; connect-src 'self' https://poetry.shemaxpoetry.workers.dev https://cdn1.suno.ai https://shemaxpoetry.website.yandexcloud.net https://raw.githubusercontent.com" + (isAdmin ? " https://challenges.cloudflare.com" : "") + "; font-src 'self';" + (isAdmin ? " frame-src https://challenges.cloudflare.com;" : "");
       if (!isHtml) csp = "";
       var resp = new Response(value, { headers: { "Content-Type": ct, "Cache-Control": "no-cache, must-revalidate" } });
       if (csp) resp.headers.set("Content-Security-Policy", csp);
@@ -1465,3 +1488,4 @@ var worker_default = {
 export {
   worker_default as default
 };
+//# sourceMappingURL=worker.js.map

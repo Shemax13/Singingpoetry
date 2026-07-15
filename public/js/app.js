@@ -1,4 +1,4 @@
-const API = 'https://poetry.shemax.workers.dev/api';
+const API = 'https://poetry.shemaxpoetry.workers.dev/api';
 const CACHE_TTL = 1800000;
 
 var playerQueue = [];

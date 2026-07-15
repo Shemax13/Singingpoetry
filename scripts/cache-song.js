@@ -4,7 +4,7 @@
 // The file is uploaded through the Worker, which stores it on GitHub,
 // then updates the song's tg_video_url in the database.
 
-var WORKER = 'https://poetry.shemax.workers.dev';
+var WORKER = 'https://poetry.shemaxpoetry.workers.dev';
 
 async function main() {
   var args = process.argv.slice(2);

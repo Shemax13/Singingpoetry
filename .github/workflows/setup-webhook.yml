@@ -25,7 +25,7 @@ jobs:
           echo "::endgroup::"
 
           echo "::group::Set webhook"
-          WEBHOOK_URL="https://poetry.shemax.workers.dev/api/webhook"
+          WEBHOOK_URL="https://poetry.shemaxpoetry.workers.dev/api/webhook"
           RESULT=$(curl -sf -X POST "${BASE}/setWebhook" \
             -H "Content-Type: application/json" \
             -d "{\"url\": \"${WEBHOOK_URL}\", \"allowed_updates\": [\"message\", \"channel_post\"]}")

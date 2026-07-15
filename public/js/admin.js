@@ -1,4 +1,4 @@
-const API = 'https://poetry.shemax.workers.dev/api';
+const API = 'https://poetry.shemaxpoetry.workers.dev/api';
 let token = localStorage.getItem('shemax-admin-token');
 let songs = [];
 let songs2 = [];
@@ -747,7 +747,7 @@ async function showPodcastSelector(songId) {
 }
 
 // Player
-var API_BASE = 'https://poetry.shemax.workers.dev/api';
+var API_BASE = 'https://poetry.shemaxpoetry.workers.dev/api';
 
 function openPlayer(id) {
   const song = songs.find(s => s.id === id);

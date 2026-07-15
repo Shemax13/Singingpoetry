@@ -10,7 +10,7 @@ export var cors = {
 };
 
 export var corsRestricted = {
-  "Access-Control-Allow-Origin": "https://poetry.shemax.workers.dev",
+  "Access-Control-Allow-Origin": "https://poetry.shemaxpoetry.workers.dev",
   "Access-Control-Allow-Methods": "GET,POST,PUT,DELETE,OPTIONS",
   "Access-Control-Allow-Headers": "Content-Type,Authorization",
   "Access-Control-Max-Age": "86400"

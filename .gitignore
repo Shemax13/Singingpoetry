@@ -7,3 +7,4 @@ scripts/deploy*.mjs
 /tmp/
 backups/
 dist/
+SESSION.md
