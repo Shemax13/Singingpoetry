@@ -1341,10 +1341,18 @@ var worker_default = {
           var me = await (await fetch(tgBase + "/getMe")).json();
           var chatInfo = null;
           if (me.ok) {
-            var ci = await (await fetch(tgBase + "/getChat", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ chat_id: url.searchParams.get("channel") || "@shemaxpoetry" }) })).json();
-            chatInfo = ci;
+            var chatParam = url.searchParams.get("chat_id");
+            if (chatParam) {
+              chatInfo = await (await fetch(tgBase + "/getChat", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ chat_id: chatParam }) })).json();
+            }
           }
-          return secureJSON({ ok: true, data: { me, channel: chatInfo } });
+          var updates = null;
+          try {
+            var uResp = await (await fetch(tgBase + "/getUpdates", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ timeout: 1, allowed_updates: ["message"] }) })).json();
+            updates = uResp;
+          } catch (e2) {
+          }
+          return secureJSON({ ok: true, data: { me, chat: chatInfo, updates } });
         }
         if (method === "POST" && path === "/api/admin/resolve-tg-link") {
           if (!await isAuth(request, DB)) return err("Unauthorized", 401);

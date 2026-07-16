@@ -708,10 +708,18 @@ export default {
           var me = await (await fetch(tgBase + "/getMe")).json();
           var chatInfo = null;
           if (me.ok) {
-            var ci = await (await fetch(tgBase + "/getChat", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ chat_id: url.searchParams.get("channel") || "@shemaxpoetry" }) })).json();
-            chatInfo = ci;
+            var chatParam = url.searchParams.get("chat_id");
+            if (chatParam) {
+              chatInfo = await (await fetch(tgBase + "/getChat", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ chat_id: chatParam }) })).json();
+            }
           }
-          return secureJSON({ ok: true, data: { me: me, channel: chatInfo } });
+          // Also get bot's recent updates to find chats
+          var updates = null;
+          try {
+            var uResp = await (await fetch(tgBase + "/getUpdates", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ timeout: 1, allowed_updates: ["message"] }) })).json();
+            updates = uResp;
+          } catch (e) { }
+          return secureJSON({ ok: true, data: { me: me, chat: chatInfo, updates: updates } });
         }
 
         // Resolve a t.me link to fresh file_id + URL, save to song
