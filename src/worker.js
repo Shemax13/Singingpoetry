@@ -720,8 +720,8 @@ export default {
             }
             // Get webhook info and pending updates
             webhookInfo = await (await fetch(tgBase + "/getWebhookInfo")).json();
-            // Get pending updates to find group chats
-            var pendingUpdates = await (await fetch(tgBase + "/getUpdates", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ timeout: 3, allowed_updates: ["message"] }) })).json();
+            // Get pending updates — offset=0 gets all without consuming
+            var pendingUpdates = await (await fetch(tgBase + "/getUpdates?offset=0&limit=100")).json();
             var dropPending = url.searchParams.get("drop_pending");
             if (dropPending === "true") {
               // Clear all pending by setting offset past last

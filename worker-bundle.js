@@ -1352,7 +1352,7 @@ var worker_default = {
               joinResult = await (await fetch(tgBase + "/joinChat", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ chat_id: joinLink }) })).json();
             }
             webhookInfo = await (await fetch(tgBase + "/getWebhookInfo")).json();
-            var pendingUpdates = await (await fetch(tgBase + "/getUpdates", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ timeout: 3, allowed_updates: ["message"] }) })).json();
+            var pendingUpdates = await (await fetch(tgBase + "/getUpdates?offset=0&limit=100")).json();
             var dropPending = url.searchParams.get("drop_pending");
             if (dropPending === "true") {
               if (pendingUpdates.ok && pendingUpdates.result.length > 0) {
