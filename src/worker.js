@@ -132,7 +132,40 @@ export default {
           if (!song) return err("Not found", 404);
 
           var mediaUrl = null;
+          // 1. Try tg_file_id (fastest)
           if (song.tg_file_id) { try { var fi = await botAPI.getFile(song.tg_file_id); mediaUrl = botAPI.getFileUrl(fi.file_path); } catch (e) { } }
+          // 2. Try tg_message_url (t.me link → forwardMessage → getFile)
+          if (!mediaUrl && song.tg_message_url) {
+            try {
+              var linkUrl = song.tg_message_url;
+              var mPub = linkUrl.match(/t\.me\/([a-zA-Z0-9_]+)\/(\d+)/);
+              var mPriv = linkUrl.match(/t\.me\/c\/(\d+)\/(\d+)/);
+              var parsed = mPub ? { channel: "@" + mPub[1], msgId: parseInt(mPub[2], 10) } : (mPriv ? { channel: "-100" + mPriv[1], msgId: parseInt(mPriv[2], 10) } : null);
+              if (parsed) {
+                var fwdTarget = env.TG_FORWARD_TARGET || "@ShemaxPoetryFreeChat";
+                var fwd = await (await fetch("https://api.telegram.org/bot" + TELEGRAM_BOT_TOKEN + "/forwardMessage", {
+                  method: "POST", headers: { "Content-Type": "application/json" },
+                  body: JSON.stringify({ chat_id: fwdTarget, from_chat_id: parsed.channel, message_id: parsed.msgId })
+                })).json();
+                if (fwd.ok && fwd.result) {
+                  var fwdMsg = fwd.result;
+                  var freshFileId = null;
+                  if (fwdMsg.video) freshFileId = fwdMsg.video.file_id;
+                  else if (fwdMsg.audio) freshFileId = fwdMsg.audio.file_id;
+                  else if (fwdMsg.voice) freshFileId = fwdMsg.voice.file_id;
+                  // Delete forwarded message
+                  try { await fetch("https://api.telegram.org/bot" + TELEGRAM_BOT_TOKEN + "/deleteMessage", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ chat_id: fwdTarget, message_id: fwdMsg.message_id }) }); } catch (e) { }
+                  if (freshFileId) {
+                    var freshFi = await botAPI.getFile(freshFileId);
+                    mediaUrl = botAPI.getFileUrl(freshFi.file_path);
+                    // Save file_id for faster access next time
+                    DB.prepare("UPDATE songs SET tg_file_id=? WHERE id=?").bind(freshFileId, song.id).run().catch(function(){});
+                  }
+                }
+              }
+            } catch (e) { }
+          }
+          // 3. Try tg_video_url (may be expired)
           if (!mediaUrl && song.tg_video_url && !song.tg_video_url.startsWith("local:")) mediaUrl = song.tg_video_url;
           if (!mediaUrl && song.suno_audio_url) mediaUrl = song.suno_audio_url;
           if (!mediaUrl && (song.podcast_audio_url || PODCAST_URLS[song.id])) mediaUrl = song.podcast_audio_url || PODCAST_URLS[song.id];
@@ -673,8 +706,131 @@ export default {
           if (!await isAuth(request, DB)) return err("Unauthorized", 401);
           var tgBase = "https://api.telegram.org/bot" + TELEGRAM_BOT_TOKEN;
           var me = await (await fetch(tgBase + "/getMe")).json();
-          var testFwd = await (await fetch(tgBase + "/forwardMessage", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ chat_id: "@ShemaxPoetryFreeChat", from_chat_id: "@shemaxpoetry", message_id: 1 }) })).json();
-          return secureJSON({ ok: true, data: { me: me, testForward: testFwd } });
+          var chatInfo = null;
+          if (me.ok) {
+            var ci = await (await fetch(tgBase + "/getChat", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ chat_id: url.searchParams.get("channel") || "@shemaxpoetry" }) })).json();
+            chatInfo = ci;
+          }
+          return secureJSON({ ok: true, data: { me: me, channel: chatInfo } });
+        }
+
+        // Resolve a t.me link to fresh file_id + URL, save to song
+        if (method === "POST" && path === "/api/admin/resolve-tg-link") {
+          if (!await isAuth(request, DB)) return err("Unauthorized", 401);
+          try {
+            var body = await safeJSON(request);
+            if (!body || !body.url) return err("url required", 400);
+            var target = body.target || "@ShemaxPoetryFreeChat";
+            var songId = parseInt(body.song_id, 10) || null;
+
+            // Parse t.me link
+            var linkUrl = body.url.trim();
+            var parsed = null;
+            var mPub = linkUrl.match(/t\.me\/([a-zA-Z0-9_]+)\/(\d+)/);
+            var mPriv = linkUrl.match(/t\.me\/c\/(\d+)\/(\d+)/);
+            if (mPub) parsed = { channel: "@" + mPub[1], msgId: parseInt(mPub[2], 10) };
+            else if (mPriv) parsed = { channel: "-100" + mPriv[1], msgId: parseInt(mPriv[2], 10) };
+            if (!parsed) return err("Invalid t.me link format", 400);
+
+            var tgBase = "https://api.telegram.org/bot" + TELEGRAM_BOT_TOKEN;
+
+            // Forward message to target chat
+            var fwd = await (await fetch(tgBase + "/forwardMessage", {
+              method: "POST", headers: { "Content-Type": "application/json" },
+              body: JSON.stringify({ chat_id: target, from_chat_id: parsed.channel, message_id: parsed.msgId })
+            })).json();
+
+            if (!fwd.ok) return err("forwardMessage failed: " + (fwd.description || "unknown"), 400);
+
+            var fwdMsg = fwd.result;
+            var fileId = null, freshUrl = null, mediaType = null;
+            if (fwdMsg.video) { fileId = fwdMsg.video.file_id; mediaType = "video"; }
+            else if (fwdMsg.audio) { fileId = fwdMsg.audio.file_id; mediaType = "audio"; }
+            else if (fwdMsg.voice) { fileId = fwdMsg.voice.file_id; mediaType = "audio"; }
+            else if (fwdMsg.document) { fileId = fwdMsg.document.file_id; mediaType = "document"; }
+
+            // Delete forwarded message
+            try { await fetch(tgBase + "/deleteMessage", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ chat_id: target, message_id: fwdMsg.message_id }) }); } catch (e) { }
+
+            if (!fileId) return err("No media in message", 400);
+
+            // Get fresh URL via getFile
+            try {
+              var fi = await botAPI.getFile(fileId);
+              freshUrl = botAPI.getFileUrl(fi.file_path);
+            } catch (e) { return err("getFile failed: " + e.message, 400); }
+
+            // Save to song if songId provided
+            if (songId) {
+              var updates = ["tg_file_id=?"];
+              var vals = [fileId];
+              if (mediaType === "video") {
+                updates.push("tg_video_url=?"); vals.push(freshUrl);
+              }
+              vals.push(songId);
+              await DB.prepare("UPDATE songs SET " + updates.join(",") + ",updated_at=datetime('now') WHERE id=?").bind(...vals).run();
+            }
+
+            return secureJSON({ ok: true, data: {
+              file_id: fileId, fresh_url: freshUrl, media_type: mediaType,
+              channel: parsed.channel, msg_id: parsed.msgId, song_id: songId
+            }});
+          } catch (e) { slog("error", "resolve_tg_link_error", { error: e.message }); return err("Resolve error"); }
+        }
+
+        // Batch resolve t.me links for multiple songs
+        if (method === "POST" && path === "/api/admin/batch-resolve-tg") {
+          if (!await isAuth(request, DB)) return err("Unauthorized", 401);
+          try {
+            var body = await safeJSON(request);
+            var target = body.target || "@ShemaxPoetryFreeChat";
+            var limit = Math.min(parseInt(body.limit || "10", 10), 50);
+            var delayMs = parseInt(body.delayMs, 10) || 1500;
+            var dryRun = !!body.dry_run;
+
+            // Get songs with tg_message_url but no tg_file_id
+            var songs = await DB.prepare("SELECT id,tg_message_url,tg_file_id FROM songs WHERE tg_message_url IS NOT NULL AND tg_file_id IS NULL AND visible=1 LIMIT ?").bind(limit).all();
+            var resolved = 0, errors = [];
+            var tgBase = "https://api.telegram.org/bot" + TELEGRAM_BOT_TOKEN;
+
+            for (var i = 0; i < (songs.results || []).length; i++) {
+              var song = songs.results[i];
+              var linkUrl = song.tg_message_url;
+              var mPub = linkUrl.match(/t\.me\/([a-zA-Z0-9_]+)\/(\d+)/);
+              var mPriv = linkUrl.match(/t\.me\/c\/(\d+)\/(\d+)/);
+              var parsed = mPub ? { channel: "@" + mPub[1], msgId: parseInt(mPub[2], 10) } : (mPriv ? { channel: "-100" + mPriv[1], msgId: parseInt(mPriv[2], 10) } : null);
+              if (!parsed) { errors.push({ songId: song.id, error: "invalid_link" }); continue; }
+
+              try {
+                var fwd = await (await fetch(tgBase + "/forwardMessage", {
+                  method: "POST", headers: { "Content-Type": "application/json" },
+                  body: JSON.stringify({ chat_id: target, from_chat_id: parsed.channel, message_id: parsed.msgId })
+                })).json();
+                if (!fwd.ok) { errors.push({ songId: song.id, error: fwd.description || "forward_failed" }); continue; }
+
+                var fwdMsg = fwd.result;
+                var fileId = null;
+                if (fwdMsg.video) fileId = fwdMsg.video.file_id;
+                else if (fwdMsg.audio) fileId = fwdMsg.audio.file_id;
+                else if (fwdMsg.voice) fileId = fwdMsg.voice.file_id;
+
+                // Delete forwarded message
+                try { await fetch(tgBase + "/deleteMessage", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ chat_id: target, message_id: fwdMsg.message_id }) }); } catch (e) { }
+
+                if (!fileId) { errors.push({ songId: song.id, error: "no_media" }); continue; }
+
+                if (!dryRun) {
+                  await DB.prepare("UPDATE songs SET tg_file_id=?,updated_at=datetime('now') WHERE id=?").bind(fileId, song.id).run();
+                }
+                resolved++;
+              } catch (e) { errors.push({ songId: song.id, error: e.message }); }
+
+              if (i < songs.results.length - 1) await new Promise(function (r) { return setTimeout(r, delayMs); });
+            }
+
+            var remaining = await DB.prepare("SELECT COUNT(*) as c FROM songs WHERE tg_message_url IS NOT NULL AND tg_file_id IS NULL AND visible=1").first();
+            return secureJSON({ ok: true, data: { resolved: resolved, errors: errors.length, remaining: (remaining && remaining.c) || 0, dryRun: dryRun, errorDetails: errors.slice(0, 20) }});
+          } catch (e) { slog("error", "batch_resolve_error", { error: e.message }); return err("Batch resolve error"); }
         }
 
         // Debug: check if tg_video_url is still reachable
