@@ -668,6 +668,15 @@ export default {
           } catch (e) { return err("Create songs error"); }
         }
 
+        // Debug: check bot connectivity
+        if (method === "GET" && path === "/api/admin/debug-bot") {
+          if (!await isAuth(request, DB)) return err("Unauthorized", 401);
+          var tgBase = "https://api.telegram.org/bot" + TELEGRAM_BOT_TOKEN;
+          var me = await (await fetch(tgBase + "/getMe")).json();
+          var testFwd = await (await fetch(tgBase + "/forwardMessage", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ chat_id: "@ShemaxPoetryFreeChat", from_chat_id: "@shemaxpoetry", message_id: 1 }) })).json();
+          return secureJSON({ ok: true, data: { me: me, testForward: testFwd } });
+        }
+
         // Debug: check if tg_video_url is still reachable
         if (method === "GET" && path === "/api/admin/check-urls") {
           if (!await isAuth(request, DB)) return err("Unauthorized", 401);
