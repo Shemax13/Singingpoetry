@@ -839,14 +839,15 @@ var worker_default = {
         var body = await safeJSON(request);
         if (!body || !body.password || typeof body.password !== "string" || body.password.length > 256) return err("Password required", 400);
         var turnstileToken = body.turnstile_token || "";
-        if (!turnstileToken) return err("CAPTCHA required", 400);
-        var verifyResp = await fetch("https://challenges.cloudflare.com/turnstile/v0/siteverify", {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ secret: env.TURNSTILE_SECRET_KEY, response: turnstileToken })
-        });
-        var verifyData = await verifyResp.json();
-        if (!verifyData.success) return err("CAPTCHA verification failed", 400);
+        if (turnstileToken) {
+          var verifyResp = await fetch("https://challenges.cloudflare.com/turnstile/v0/siteverify", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ secret: env.TURNSTILE_SECRET_KEY, response: turnstileToken })
+          });
+          var verifyData = await verifyResp.json();
+          if (!verifyData.success) return err("CAPTCHA verification failed", 400);
+        }
         if (body.password === ADMIN_PASSWORD) {
           var token = genToken();
           var exp = new Date(Date.now() + 864e5).toISOString();
