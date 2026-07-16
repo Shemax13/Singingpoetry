@@ -1341,6 +1341,7 @@ var worker_default = {
           var me = await (await fetch(tgBase + "/getMe")).json();
           var chatInfo = null;
           var joinResult = null;
+          var webhookInfo = null;
           if (me.ok) {
             var chatParam = url.searchParams.get("chat_id");
             if (chatParam) {
@@ -1350,8 +1351,13 @@ var worker_default = {
             if (joinLink) {
               joinResult = await (await fetch(tgBase + "/joinChat", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ chat_id: joinLink }) })).json();
             }
+            webhookInfo = await (await fetch(tgBase + "/getWebhookInfo")).json();
+            var dropPending = url.searchParams.get("drop_pending");
+            if (dropPending === "true") {
+              await (await fetch(tgBase + "/getUpdates", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ offset: -1 }) })).json();
+            }
           }
-          return secureJSON({ ok: true, data: { me, chat: chatInfo, join: joinResult } });
+          return secureJSON({ ok: true, data: { me, chat: chatInfo, join: joinResult, webhook: webhookInfo } });
         }
         if (method === "POST" && path === "/api/admin/resolve-tg-link") {
           if (!await isAuth(request, DB)) return err("Unauthorized", 401);

@@ -708,6 +708,7 @@ export default {
           var me = await (await fetch(tgBase + "/getMe")).json();
           var chatInfo = null;
           var joinResult = null;
+          var webhookInfo = null;
           if (me.ok) {
             var chatParam = url.searchParams.get("chat_id");
             if (chatParam) {
@@ -717,8 +718,14 @@ export default {
             if (joinLink) {
               joinResult = await (await fetch(tgBase + "/joinChat", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ chat_id: joinLink }) })).json();
             }
+            // Get webhook info and pending updates
+            webhookInfo = await (await fetch(tgBase + "/getWebhookInfo")).json();
+            var dropPending = url.searchParams.get("drop_pending");
+            if (dropPending === "true") {
+              await (await fetch(tgBase + "/getUpdates", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ offset: -1 }) })).json();
+            }
           }
-          return secureJSON({ ok: true, data: { me: me, chat: chatInfo, join: joinResult } });
+          return secureJSON({ ok: true, data: { me: me, chat: chatInfo, join: joinResult, webhook: webhookInfo } });
         }
 
         // Resolve a t.me link to fresh file_id + URL, save to song
