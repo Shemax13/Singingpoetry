@@ -1340,19 +1340,18 @@ var worker_default = {
           var tgBase = "https://api.telegram.org/bot" + TELEGRAM_BOT_TOKEN;
           var me = await (await fetch(tgBase + "/getMe")).json();
           var chatInfo = null;
+          var joinResult = null;
           if (me.ok) {
             var chatParam = url.searchParams.get("chat_id");
             if (chatParam) {
               chatInfo = await (await fetch(tgBase + "/getChat", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ chat_id: chatParam }) })).json();
             }
+            var joinLink = url.searchParams.get("join");
+            if (joinLink) {
+              joinResult = await (await fetch(tgBase + "/joinChat", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ chat_id: joinLink }) })).json();
+            }
           }
-          var updates = null;
-          try {
-            var uResp = await (await fetch(tgBase + "/getUpdates", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ timeout: 1, allowed_updates: ["message"] }) })).json();
-            updates = uResp;
-          } catch (e2) {
-          }
-          return secureJSON({ ok: true, data: { me, chat: chatInfo, updates } });
+          return secureJSON({ ok: true, data: { me, chat: chatInfo, join: joinResult } });
         }
         if (method === "POST" && path === "/api/admin/resolve-tg-link") {
           if (!await isAuth(request, DB)) return err("Unauthorized", 401);
