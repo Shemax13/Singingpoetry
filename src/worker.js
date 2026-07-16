@@ -992,7 +992,7 @@ export default {
           var target = url.searchParams.get("target") || "-1004422179990";
           var from = parseInt(url.searchParams.get("from"), 10) || 50;
           var to = parseInt(url.searchParams.get("to"), 10) || 55;
-          if (to - from > 20) to = from + 20;
+          if (to - from > 50) to = from + 50;
           var tgBase = "https://api.telegram.org/bot" + TELEGRAM_BOT_TOKEN;
           var posts = [];
           for (var id = from; id <= to; id++) {
@@ -1001,9 +1001,12 @@ export default {
               if (r.ok) {
                 var fwd = r.result;
                 var caption = fwd.caption || fwd.text || "";
-                var hasMedia = !!(fwd.video || fwd.audio || fwd.voice || fwd.photo);
+                var fileId = null;
+                if (fwd.video) fileId = fwd.video.file_id;
+                else if (fwd.audio) fileId = fwd.audio.file_id;
+                else if (fwd.voice) fileId = fwd.voice.file_id;
                 var mediaType = fwd.video ? "video" : fwd.audio ? "audio" : fwd.voice ? "voice" : fwd.photo ? "photo" : "text";
-                posts.push({ id: id, type: mediaType, caption: caption.substring(0, 200), hasMedia: hasMedia });
+                posts.push({ id: id, type: mediaType, caption: caption.substring(0, 200), fileId: fileId ? fileId.substring(0, 40) + "..." : null });
                 try { await fetch(tgBase + "/deleteMessage", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ chat_id: target, message_id: fwd.message_id }) }); } catch (e) { }
               } else { posts.push({ id: id, error: r.description }); }
             } catch (e) { posts.push({ id: id, error: e.message }); }
