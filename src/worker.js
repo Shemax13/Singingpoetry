@@ -932,6 +932,22 @@ export default {
                     }
                   }
 
+                  // Also try matching by lyrics content
+                  if (!match && fileId && text.length > 20) {
+                    var normText = text.toLowerCase().replace(/[^\p{L}\p{N}]+/gu, "").trim();
+                    for (var si2 = 0; si2 < songs.length; si2++) {
+                      if (songs[si2].tg_file_id) continue; // skip already repaired
+                      var lyrics = (songs[si2].lyrics || "").toLowerCase().replace(/[^\p{L}\p{N}]+/gu, "").trim();
+                      if (lyrics.length > 20 && normText.length > 20) {
+                        // Check if first 100 chars of lyrics match first 100 chars of caption
+                        if (lyrics.substring(0, 100) === normText.substring(0, 100)) {
+                          match = songs[si2];
+                          break;
+                        }
+                      }
+                    }
+                  }
+
                   if (match) {
                     found.push(id);
                     if (fileId && !match.tg_file_id && !dryRun) {
@@ -975,7 +991,8 @@ export default {
           var channel = url.searchParams.get("channel") || "@shemaxpoetry";
           var target = url.searchParams.get("target") || "-1004422179990";
           var from = parseInt(url.searchParams.get("from"), 10) || 50;
-          var to = parseInt(url.searchParams.get("to"), 10) || 60;
+          var to = parseInt(url.searchParams.get("to"), 10) || 55;
+          if (to - from > 20) to = from + 20;
           var tgBase = "https://api.telegram.org/bot" + TELEGRAM_BOT_TOKEN;
           var posts = [];
           for (var id = from; id <= to; id++) {
@@ -986,10 +1003,10 @@ export default {
                 var caption = fwd.caption || fwd.text || "";
                 var hasMedia = !!(fwd.video || fwd.audio || fwd.voice || fwd.photo);
                 var mediaType = fwd.video ? "video" : fwd.audio ? "audio" : fwd.voice ? "voice" : fwd.photo ? "photo" : "text";
-                posts.push({ id: id, type: mediaType, captionPreview: caption.substring(0, 120), hasMedia: hasMedia });
+                posts.push({ id: id, type: mediaType, caption: caption.substring(0, 200), hasMedia: hasMedia });
                 try { await fetch(tgBase + "/deleteMessage", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ chat_id: target, message_id: fwd.message_id }) }); } catch (e) { }
-              }
-            } catch (e) { }
+              } else { posts.push({ id: id, error: r.description }); }
+            } catch (e) { posts.push({ id: id, error: e.message }); }
             await new Promise(function (r) { setTimeout(r, 400); });
           }
           return secureJSON({ ok: true, data: posts });
