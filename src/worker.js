@@ -720,12 +720,18 @@ export default {
             }
             // Get webhook info and pending updates
             webhookInfo = await (await fetch(tgBase + "/getWebhookInfo")).json();
+            // Get pending updates to find group chats
+            var pendingUpdates = await (await fetch(tgBase + "/getUpdates", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ timeout: 3, allowed_updates: ["message"] }) })).json();
             var dropPending = url.searchParams.get("drop_pending");
             if (dropPending === "true") {
-              await (await fetch(tgBase + "/getUpdates", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ offset: -1 }) })).json();
+              // Clear all pending by setting offset past last
+              if (pendingUpdates.ok && pendingUpdates.result.length > 0) {
+                var lastId = pendingUpdates.result[pendingUpdates.result.length - 1].update_id;
+                await (await fetch(tgBase + "/getUpdates", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ offset: lastId + 1 }) })).json();
+              }
             }
           }
-          return secureJSON({ ok: true, data: { me: me, chat: chatInfo, join: joinResult, webhook: webhookInfo } });
+          return secureJSON({ ok: true, data: { me: me, chat: chatInfo, join: joinResult, webhook: webhookInfo, pendingUpdates: pendingUpdates } });
         }
 
         // Resolve a t.me link to fresh file_id + URL, save to song

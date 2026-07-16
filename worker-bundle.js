@@ -1352,12 +1352,16 @@ var worker_default = {
               joinResult = await (await fetch(tgBase + "/joinChat", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ chat_id: joinLink }) })).json();
             }
             webhookInfo = await (await fetch(tgBase + "/getWebhookInfo")).json();
+            var pendingUpdates = await (await fetch(tgBase + "/getUpdates", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ timeout: 3, allowed_updates: ["message"] }) })).json();
             var dropPending = url.searchParams.get("drop_pending");
             if (dropPending === "true") {
-              await (await fetch(tgBase + "/getUpdates", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ offset: -1 }) })).json();
+              if (pendingUpdates.ok && pendingUpdates.result.length > 0) {
+                var lastId = pendingUpdates.result[pendingUpdates.result.length - 1].update_id;
+                await (await fetch(tgBase + "/getUpdates", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ offset: lastId + 1 }) })).json();
+              }
             }
           }
-          return secureJSON({ ok: true, data: { me, chat: chatInfo, join: joinResult, webhook: webhookInfo } });
+          return secureJSON({ ok: true, data: { me, chat: chatInfo, join: joinResult, webhook: webhookInfo, pendingUpdates } });
         }
         if (method === "POST" && path === "/api/admin/resolve-tg-link") {
           if (!await isAuth(request, DB)) return err("Unauthorized", 401);
