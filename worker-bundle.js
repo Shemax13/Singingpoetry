@@ -85,12 +85,6 @@ async function isAuth(req, DB) {
   return !!await DB.prepare("SELECT id FROM admin_sessions WHERE id=? AND expires_at>datetime('now')").bind(h.slice(7)).first();
 }
 __name(isAuth, "isAuth");
-function firstLine(caption) {
-  if (!caption) return "Untitled";
-  var s = caption.split("\n")[0];
-  return s ? s.trim() : "Untitled";
-}
-__name(firstLine, "firstLine");
 function sunoExtractUrls(text) {
   if (!text) return [];
   var urls = [];
@@ -777,7 +771,7 @@ var worker_default = {
             } catch (e2) {
               return json({ ok: true });
             }
-            songObj = { title: firstLine(p.text_content), lyrics: p.text_content || null, telegram_message_id: msgIdForDedup, published_at: p.published_at };
+            songObj = { title: firstLine2(p.text_content), lyrics: p.text_content || null, telegram_message_id: msgIdForDedup, published_at: p.published_at };
             if (p.msg_type === "video") {
               songObj.tg_video_url = botAPI.getFileUrl(fileInfo.file_path);
               songObj.tg_file_id = p.file_id;
@@ -1029,7 +1023,7 @@ var worker_default = {
                   } catch (e2) {
                     continue;
                   }
-                  var songObj = { title: firstLine(p.text_content), lyrics: p.text_content || null, telegram_message_id: msgId, published_at: p.published_at };
+                  var songObj = { title: firstLine2(p.text_content), lyrics: p.text_content || null, telegram_message_id: msgId, published_at: p.published_at };
                   if (p.msg_type === "video") {
                     songObj.tg_video_url = botAPI.getFileUrl(fileInfo.file_path);
                     songObj.tg_file_id = p.file_id;
@@ -1279,7 +1273,7 @@ var worker_default = {
             for (var i = 0; i < (rows.results || []).length; i++) {
               var msg = rows.results[i];
               try {
-                var title = firstLine(msg.text_content) || "Song #" + msg.forward_from_msg_id;
+                var title = firstLine2(msg.text_content) || "Song #" + msg.forward_from_msg_id;
                 var songData = { title, lyrics: msg.text_content || null, telegram_message_id: msg.forward_from_msg_id, published_at: msg.published_at };
                 if (msg.msg_type === "video") {
                   songData.tg_file_id = msg.file_id;
@@ -1325,6 +1319,107 @@ var worker_default = {
             return secureJSON({ ok: true, data: results });
           } catch (e2) {
             return err("Check error");
+          }
+        }
+        if (method === "POST" && path === "/api/admin/scan-and-repair") {
+          if (!await isAuth(request, DB)) return err("Unauthorized", 401);
+          try {
+            var body = await safeJSON(request);
+            if (!body) return err("Invalid JSON", 400);
+            var channel = body.channel || "@shemaxpoetry";
+            var target = body.target || "@ShemaxPoetryFreeChat";
+            var fromId = parseInt(body.from, 10) || 1;
+            var toId = parseInt(body.to, 10) || 2e3;
+            if (toId - fromId > 1e4) return err("Range too large", 400);
+            var delayMs = parseInt(body.delayMs, 10) || 1500;
+            var maxEmpties = Math.min(parseInt(body.maxEmpties, 10) || 10, 50);
+            var dryRun = !!body.dry_run;
+            var tgBase = "https://api.telegram.org/bot" + TELEGRAM_BOT_TOKEN;
+            var songsRows = await DB.prepare("SELECT id,title,lyrics,tg_video_url,tg_file_id FROM songs WHERE visible=1").all();
+            var songs = songsRows.results || [];
+            var titleToSong = {};
+            for (var si = 0; si < songs.length; si++) {
+              var norm = (songs[si].title || "").toLowerCase().replace(/[^\p{L}\p{N}]+/gu, "").trim();
+              if (norm) titleToSong[norm] = songs[si];
+            }
+            var found = [], matched = [], skipped = 0, consecutiveEmpty = 0;
+            var total = 0, totalMatched = 0;
+            for (var id = fromId; id <= toId; id++) {
+              total++;
+              try {
+                var r = await (await fetch(tgBase + "/forwardMessage", {
+                  method: "POST",
+                  headers: { "Content-Type": "application/json" },
+                  body: JSON.stringify({ chat_id: target, from_chat_id: channel, message_id: id })
+                })).json();
+                if (r.ok) {
+                  consecutiveEmpty = 0;
+                  var fwd = r.result;
+                  var text = fwd.caption || fwd.text || "";
+                  var fileId = null;
+                  var msgType = "text";
+                  if (fwd.video) {
+                    fileId = fwd.video.file_id;
+                    msgType = "video";
+                  } else if (fwd.audio) {
+                    fileId = fwd.audio.file_id;
+                    msgType = "audio";
+                  } else if (fwd.voice) {
+                    fileId = fwd.voice.file_id;
+                    msgType = "voice";
+                  }
+                  var firstLine2 = (text.split("\n")[0] || "").toLowerCase().replace(/[^\p{L}\p{N}]+/gu, "").trim();
+                  var match = titleToSong[firstLine2] || null;
+                  if (!match && firstLine2.length > 5) {
+                    for (var k in titleToSong) {
+                      if (k.length > 5 && (firstLine2.indexOf(k) !== -1 || k.indexOf(firstLine2) !== -1)) {
+                        match = titleToSong[k];
+                        break;
+                      }
+                    }
+                  }
+                  if (match) {
+                    found.push(id);
+                    if (fileId && !match.tg_file_id && !dryRun) {
+                      await DB.prepare("UPDATE songs SET tg_file_id=?, telegram_message_id=? WHERE id=?").bind(fileId, id, match.id).run();
+                      matched.push({ songId: match.id, songTitle: match.title.substring(0, 50), channelId: id, fileId: fileId.substring(0, 20) + "..." });
+                      totalMatched++;
+                      slog("info", "scan_repair_match", { songId: match.id, channelId: id });
+                    } else if (fileId) {
+                      found.push(id);
+                    }
+                  }
+                  if (!dryRun) {
+                    try {
+                      await fetch(tgBase + "/deleteMessage", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ chat_id: target, message_id: fwd.message_id }) });
+                    } catch (e2) {
+                    }
+                  }
+                } else {
+                  consecutiveEmpty++;
+                  if (consecutiveEmpty >= maxEmpties) break;
+                }
+              } catch (e2) {
+                consecutiveEmpty++;
+                if (consecutiveEmpty >= maxEmpties) break;
+              }
+              if (total % 50 === 0) slog("info", "scan_repair_progress", { scanned: total, matched: totalMatched });
+              await new Promise(function(r2) {
+                return setTimeout(r2, delayMs);
+              });
+            }
+            var stillMissing = await DB.prepare("SELECT COUNT(*) as c FROM songs WHERE tg_file_id IS NULL AND visible=1").first();
+            return secureJSON({ ok: true, data: {
+              scanned: total,
+              channelPostsFound: found.length,
+              matched: matched.length,
+              stillMissing: stillMissing && stillMissing.c || 0,
+              dryRun,
+              matches: matched.slice(0, 30)
+            } });
+          } catch (e2) {
+            slog("error", "scan_repair_error", { error: e2.message });
+            return err("Scan repair error");
           }
         }
         if (method === "POST" && path === "/api/admin/repair-file-ids") {
