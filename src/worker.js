@@ -969,6 +969,32 @@ export default {
           } catch (e) { slog("error", "scan_repair_error", { error: e.message }); return err("Scan repair error"); }
         }
 
+        // Debug: preview channel post captions for matching fix
+        if (method === "GET" && path === "/api/admin/scan-preview") {
+          if (!await isAuth(request, DB)) return err("Unauthorized", 401);
+          var channel = url.searchParams.get("channel") || "@shemaxpoetry";
+          var target = url.searchParams.get("target") || "-1004422179990";
+          var from = parseInt(url.searchParams.get("from"), 10) || 50;
+          var to = parseInt(url.searchParams.get("to"), 10) || 60;
+          var tgBase = "https://api.telegram.org/bot" + TELEGRAM_BOT_TOKEN;
+          var posts = [];
+          for (var id = from; id <= to; id++) {
+            try {
+              var r = await (await fetch(tgBase + "/forwardMessage", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ chat_id: target, from_chat_id: channel, message_id: id }) })).json();
+              if (r.ok) {
+                var fwd = r.result;
+                var caption = fwd.caption || fwd.text || "";
+                var hasMedia = !!(fwd.video || fwd.audio || fwd.voice || fwd.photo);
+                var mediaType = fwd.video ? "video" : fwd.audio ? "audio" : fwd.voice ? "voice" : fwd.photo ? "photo" : "text";
+                posts.push({ id: id, type: mediaType, captionPreview: caption.substring(0, 120), hasMedia: hasMedia });
+                try { await fetch(tgBase + "/deleteMessage", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ chat_id: target, message_id: fwd.message_id }) }); } catch (e) { }
+              }
+            } catch (e) { }
+            await new Promise(function (r) { setTimeout(r, 400); });
+          }
+          return secureJSON({ ok: true, data: posts });
+        }
+
         // Repair tg_file_id for songs that lost it (all songs have NULL tg_file_id)
         if (method === "POST" && path === "/api/admin/repair-file-ids") {
           if (!await isAuth(request, DB)) return err("Unauthorized", 401);
