@@ -162,20 +162,22 @@ async function playSong(index) {
   // Media proxy URL (worker redirects to Telegram or GitHub raw)
   var proxyUrl = API + '/media/' + song.id;
 
-  // Suno CDN audio plays directly
+  // Suno CDN audio plays directly (only if URL is suno.ai domain, not telegram)
   var audioSourceUrl = null;
-  if (hasSunoAudio && !hasVideo) {
+  if (hasSunoAudio && !hasVideo && song.suno_audio_url && song.suno_audio_url.indexOf('suno') !== -1) {
     audioSourceUrl = song.suno_audio_url;
+  } else if (hasSunoAudio && !hasVideo) {
+    audioSourceUrl = API + '/media/' + song.id;
   } else if (hasPodcastAudio) {
     audioSourceUrl = API + '/media/' + song.id;
   } else if (hasVideo) {
     audioSourceUrl = null; // video handles playback
   }
 
-  // Video — try direct tg_video_url first, fallback to proxy
+  // Video — always use worker proxy (generates fresh URLs from tg_file_id)
   videoEl.style.display = playerMode === 'video' ? 'block' : 'none';
   if (hasVideo) {
-    videoEl.src = song.tg_video_url || proxyUrl;
+    videoEl.src = proxyUrl;
     videoEl.load();
     videoEl._loadTimeout = setTimeout(function() {
       nextSong();
@@ -396,12 +398,8 @@ function updatePlayBtn() {
 videoEl.addEventListener('play', function(){ isPlaying = true; updatePlayBtn(); showPlayBtn(); $('loadingIndicator').classList.add('hidden'); });
 videoEl.addEventListener('pause', function(){ isPlaying = false; updatePlayBtn(); });
 videoEl.addEventListener('error', function() {
-  // If direct tg_video_url failed, retry via worker proxy
-  var song = playerQueue[currentIndex];
-  if (song && videoEl.src !== (API + '/media/' + song.id)) {
-    videoEl.src = API + '/media/' + song.id;
-    videoEl.load();
-  }
+  // Already using proxy — skip to next song on error
+  nextSong();
 });
 videoEl.addEventListener('waiting', function(){ $('loadingIndicator').classList.remove('hidden'); });
 audioEl.addEventListener('waiting', function(){ $('loadingIndicator').classList.remove('hidden'); });
@@ -418,7 +416,7 @@ function preloadNextSong() {
   var preloadUrl = null;
   var preloadAs = 'audio';
   if (next.tg_video_url) {
-    preloadUrl = next.tg_video_url;
+    preloadUrl = API + '/media/' + next.id;
     preloadAs = 'video';
   } else if (next.tg_file_id) {
     preloadUrl = API + '/media/' + next.id;
