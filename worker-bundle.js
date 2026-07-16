@@ -1307,6 +1307,26 @@ var worker_default = {
             return err("Create songs error");
           }
         }
+        if (method === "GET" && path === "/api/admin/check-urls") {
+          if (!await isAuth(request, DB)) return err("Unauthorized", 401);
+          try {
+            var limit = Math.min(parseInt(url.searchParams.get("limit") || "5", 10), 20);
+            var rows = await DB.prepare("SELECT id,tg_video_url FROM songs WHERE tg_video_url IS NOT NULL AND visible=1 ORDER BY id ASC LIMIT ?").bind(limit).all();
+            var results = [];
+            for (var i = 0; i < (rows.results || []).length; i++) {
+              var s = rows.results[i];
+              try {
+                var r = await fetch(s.tg_video_url, { method: "HEAD", redirect: "follow" });
+                results.push({ id: s.id, status: r.status, ok: r.ok, url: s.tg_video_url.substring(0, 80) + "..." });
+              } catch (e2) {
+                results.push({ id: s.id, error: e2.message, url: s.tg_video_url.substring(0, 80) + "..." });
+              }
+            }
+            return secureJSON({ ok: true, data: results });
+          } catch (e2) {
+            return err("Check error");
+          }
+        }
         if (method === "POST" && path === "/api/admin/repair-file-ids") {
           if (!await isAuth(request, DB)) return err("Unauthorized", 401);
           try {
