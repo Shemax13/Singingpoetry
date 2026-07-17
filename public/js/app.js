@@ -398,8 +398,8 @@ function updatePlayBtn() {
 videoEl.addEventListener('play', function(){ isPlaying = true; updatePlayBtn(); showPlayBtn(); $('loadingIndicator').classList.add('hidden'); });
 videoEl.addEventListener('pause', function(){ isPlaying = false; updatePlayBtn(); });
 videoEl.addEventListener('error', function() {
-  // Already using proxy — skip to next song on error
-  nextSong();
+  // Don't auto-skip — just hide loading indicator
+  $('loadingIndicator').classList.add('hidden');
 });
 videoEl.addEventListener('waiting', function(){ $('loadingIndicator').classList.remove('hidden'); });
 audioEl.addEventListener('waiting', function(){ $('loadingIndicator').classList.remove('hidden'); });

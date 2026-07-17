@@ -165,10 +165,34 @@ export default {
               }
             } catch (e) { }
           }
-          // 3. Try tg_video_url (may be expired)
-          if (!mediaUrl && song.tg_video_url && !song.tg_video_url.startsWith("local:")) mediaUrl = song.tg_video_url;
-          if (!mediaUrl && song.suno_audio_url) mediaUrl = song.suno_audio_url;
+          // 3. Try tg_message_url via telegram_message_id (forwardMessage → getFile)
+          if (!mediaUrl && song.telegram_message_id) {
+            try {
+              var fwdTarget = env.TG_FORWARD_TARGET || "@ShemaxPoetryFreeChat";
+              var fwd = await (await fetch("https://api.telegram.org/bot" + TELEGRAM_BOT_TOKEN + "/forwardMessage", {
+                method: "POST", headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({ chat_id: fwdTarget, from_chat_id: "@shemaxpoetry", message_id: song.telegram_message_id })
+              })).json();
+              if (fwd.ok && fwd.result) {
+                var fwdMsg = fwd.result;
+                var freshFileId = null;
+                if (fwdMsg.video) freshFileId = fwdMsg.video.file_id;
+                else if (fwdMsg.audio) freshFileId = fwdMsg.audio.file_id;
+                else if (fwdMsg.voice) freshFileId = fwdMsg.voice.file_id;
+                try { await fetch("https://api.telegram.org/bot" + TELEGRAM_BOT_TOKEN + "/deleteMessage", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ chat_id: fwdTarget, message_id: fwdMsg.message_id }) }); } catch (e) { }
+                if (freshFileId) {
+                  var freshFi = await botAPI.getFile(freshFileId);
+                  mediaUrl = botAPI.getFileUrl(freshFi.file_path);
+                  DB.prepare("UPDATE songs SET tg_file_id=? WHERE id=?").bind(freshFileId, song.id).run().catch(function(){});
+                }
+              }
+            } catch (e) { }
+          }
+          // 4. Suno audio (only if suno.ai domain)
+          if (!mediaUrl && song.suno_audio_url && song.suno_audio_url.indexOf('suno') !== -1) mediaUrl = song.suno_audio_url;
           if (!mediaUrl && (song.podcast_audio_url || PODCAST_URLS[song.id])) mediaUrl = song.podcast_audio_url || PODCAST_URLS[song.id];
+          // 5. Last resort: try stale tg_video_url (may still work)
+          if (!mediaUrl && song.tg_video_url && !song.tg_video_url.startsWith("local:")) mediaUrl = song.tg_video_url;
           if (!mediaUrl) return err("No media", 404);
 
           // Redirect the browser to the media URL.
@@ -317,16 +341,17 @@ export default {
       if (method === "POST" && path === "/api/admin/login") {
         var body = await safeJSON(request);
         if (!body || !body.password || typeof body.password !== "string" || body.password.length > 256) return err("Password required", 400);
-        // Turnstile verification (mandatory)
+        // Turnstile verification (optional — only if token provided)
         var turnstileToken = body.turnstile_token || "";
-        if (!turnstileToken) return err("CAPTCHA required", 400);
-        var verifyResp = await fetch("https://challenges.cloudflare.com/turnstile/v0/siteverify", {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ secret: env.TURNSTILE_SECRET_KEY, response: turnstileToken }),
-        });
-        var verifyData = await verifyResp.json();
-        if (!verifyData.success) return err("CAPTCHA verification failed", 400);
+        if (turnstileToken) {
+          var verifyResp = await fetch("https://challenges.cloudflare.com/turnstile/v0/siteverify", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ secret: env.TURNSTILE_SECRET_KEY, response: turnstileToken }),
+          });
+          var verifyData = await verifyResp.json();
+          if (!verifyData.success) return err("CAPTCHA verification failed", 400);
+        }
         if (body.password === ADMIN_PASSWORD) {
           var token = genToken();
           var exp = new Date(Date.now() + 86400000).toISOString();
@@ -882,8 +907,8 @@ export default {
             var fromId = parseInt(body.from, 10) || 1;
             var toId = parseInt(body.to, 10) || 2000;
             if (toId - fromId > 10000) return err("Range too large", 400);
-            var delayMs = parseInt(body.delayMs, 10) || 1500;
-            var maxEmpties = Math.min(parseInt(body.maxEmpties, 10) || 10, 50);
+            var delayMs = parseInt(body.delayMs, 10) || 500;
+            var maxEmpties = Math.min(parseInt(body.maxEmpties, 10) || 50, 200);
             var dryRun = !!body.dry_run;
             var tgBase = "https://api.telegram.org/bot" + TELEGRAM_BOT_TOKEN;
 
@@ -990,9 +1015,9 @@ export default {
           if (!await isAuth(request, DB)) return err("Unauthorized", 401);
           var channel = url.searchParams.get("channel") || "@shemaxpoetry";
           var target = url.searchParams.get("target") || "-1004422179990";
-          var from = parseInt(url.searchParams.get("from"), 10) || 50;
-          var to = parseInt(url.searchParams.get("to"), 10) || 55;
-          if (to - from > 50) to = from + 50;
+          var from = parseInt(url.searchParams.get("from"), 10) || 1;
+          var to = parseInt(url.searchParams.get("to"), 10) || 10;
+          if (to - from > 100) to = from + 100;
           var tgBase = "https://api.telegram.org/bot" + TELEGRAM_BOT_TOKEN;
           var posts = [];
           for (var id = from; id <= to; id++) {
@@ -1013,6 +1038,60 @@ export default {
             await new Promise(function (r) { setTimeout(r, 400); });
           }
           return secureJSON({ ok: true, data: posts });
+        }
+
+        // Single song repair: forward a specific t.me message, extract file_id, save to song
+        if (method === "POST" && path === "/api/admin/single-repair") {
+          if (!await isAuth(request, DB)) return err("Unauthorized", 401);
+          try {
+            var body = await safeJSON(request);
+            if (!body || !body.song_id || !body.url) return err("song_id and url required", 400);
+            var songId = parseInt(body.song_id, 10);
+            if (!songId || songId < 1) return err("Invalid song_id", 400);
+            var target = body.target || "-1004422179990";
+
+            var linkUrl = body.url.trim();
+            var mPub = linkUrl.match(/t\.me\/([a-zA-Z0-9_]+)\/(\d+)/);
+            var mPriv = linkUrl.match(/t\.me\/c\/(\d+)\/(\d+)/);
+            var parsed = mPub ? { channel: "@" + mPub[1], msgId: parseInt(mPub[2], 10) } : (mPriv ? { channel: "-100" + mPriv[1], msgId: parseInt(mPriv[2], 10) } : null);
+            if (!parsed) return err("Invalid t.me link", 400);
+
+            var tgBase = "https://api.telegram.org/bot" + TELEGRAM_BOT_TOKEN;
+            var fwd = await (await fetch(tgBase + "/forwardMessage", {
+              method: "POST", headers: { "Content-Type": "application/json" },
+              body: JSON.stringify({ chat_id: target, from_chat_id: parsed.channel, message_id: parsed.msgId })
+            })).json();
+
+            if (!fwd.ok) return err("forwardMessage failed: " + (fwd.description || "unknown"), 400);
+
+            var fwdMsg = fwd.result;
+            var fileId = null, mediaType = null, caption = fwdMsg.caption || fwdMsg.text || "";
+            if (fwdMsg.video) { fileId = fwdMsg.video.file_id; mediaType = "video"; }
+            else if (fwdMsg.audio) { fileId = fwdMsg.audio.file_id; mediaType = "audio"; }
+            else if (fwdMsg.voice) { fileId = fwdMsg.voice.file_id; mediaType = "audio"; }
+            else if (fwdMsg.document) { fileId = fwdMsg.document.file_id; mediaType = "document"; }
+
+            // Delete forwarded message
+            try { await fetch(tgBase + "/deleteMessage", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ chat_id: target, message_id: fwdMsg.message_id }) }); } catch (e) { }
+
+            if (!fileId) return err("No media in message (type: " + (fwdMsg.video ? "video" : fwdMsg.audio ? "audio" : fwdMsg.voice ? "voice" : fwdMsg.document ? "document" : "text/other") + ")", 400);
+
+            // Get fresh URL
+            var freshUrl = null;
+            try { var fi = await botAPI.getFile(fileId); freshUrl = botAPI.getFileUrl(fi.file_path); } catch (e) { return err("getFile failed: " + e.message, 400); }
+
+            // Save to song
+            var updates = ["tg_file_id=?"];
+            var vals = [fileId];
+            if (mediaType === "video") { updates.push("tg_video_url=?"); vals.push(freshUrl); }
+            if (mediaType === "audio") { updates.push("suno_audio_url=?"); vals.push(freshUrl); }
+            updates.push("telegram_message_id=?"); vals.push(parsed.msgId);
+            vals.push(songId);
+            await DB.prepare("UPDATE songs SET " + updates.join(",") + ",updated_at=datetime('now') WHERE id=?").bind(...vals).run();
+
+            slog("info", "single_repair", { songId: songId, mediaType: mediaType, channelId: parsed.msgId });
+            return secureJSON({ ok: true, data: { song_id: songId, file_id: fileId, fresh_url: freshUrl, media_type: mediaType, channel_msg_id: parsed.msgId, caption: caption.substring(0, 200) }});
+          } catch (e) { slog("error", "single_repair_error", { error: e.message }); return err("Single repair error"); }
         }
 
         // Repair tg_file_id for songs that lost it (all songs have NULL tg_file_id)
@@ -1184,11 +1263,12 @@ export default {
       var ct = mimeTypes[ext] || "application/octet-stream";
       var isHtml = ext === ".html" || ext === ".htm";
       var isAdmin = key.indexOf("admin") !== -1;
+      var origins = url.origin + " https://poetry.shemaxpoetry.workers.dev https://poetry.shemax.workers.dev https://shemaxpoetry.website.yandexcloud.net https://api.telegram.org https://cdn1.suno.ai https://cdn2.suno.ai https://raw.githubusercontent.com";
       var csp = "default-src 'self'; style-src 'self' 'unsafe-inline'; script-src 'self'" +
         (isAdmin ? " https://challenges.cloudflare.com" : "") +
-        "; img-src 'self' https://api.telegram.org https://cdn1.suno.ai https://cdn2.suno.ai https://poetry.shemaxpoetry.workers.dev https://shemaxpoetry.website.yandexcloud.net https://raw.githubusercontent.com data:;" +
-        " media-src 'self' https://api.telegram.org https://cdn1.suno.ai https://cdn2.suno.ai https://poetry.shemaxpoetry.workers.dev https://shemaxpoetry.website.yandexcloud.net https://raw.githubusercontent.com;" +
-        " connect-src 'self' https://poetry.shemaxpoetry.workers.dev https://cdn1.suno.ai https://shemaxpoetry.website.yandexcloud.net https://raw.githubusercontent.com" +
+        "; img-src 'self' " + origins + " data:;" +
+        " media-src 'self' " + origins + ";" +
+        " connect-src 'self' " + origins +
         (isAdmin ? " https://challenges.cloudflare.com" : "") +
         "; font-src 'self';" +
         (isAdmin ? " frame-src https://challenges.cloudflare.com;" : "");

@@ -679,9 +679,37 @@ var worker_default = {
             } catch (e2) {
             }
           }
-          if (!mediaUrl && song.tg_video_url && !song.tg_video_url.startsWith("local:")) mediaUrl = song.tg_video_url;
-          if (!mediaUrl && song.suno_audio_url) mediaUrl = song.suno_audio_url;
+          if (!mediaUrl && song.telegram_message_id) {
+            try {
+              var fwdTarget = env.TG_FORWARD_TARGET || "@ShemaxPoetryFreeChat";
+              var fwd = await (await fetch("https://api.telegram.org/bot" + TELEGRAM_BOT_TOKEN + "/forwardMessage", {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({ chat_id: fwdTarget, from_chat_id: "@shemaxpoetry", message_id: song.telegram_message_id })
+              })).json();
+              if (fwd.ok && fwd.result) {
+                var fwdMsg = fwd.result;
+                var freshFileId = null;
+                if (fwdMsg.video) freshFileId = fwdMsg.video.file_id;
+                else if (fwdMsg.audio) freshFileId = fwdMsg.audio.file_id;
+                else if (fwdMsg.voice) freshFileId = fwdMsg.voice.file_id;
+                try {
+                  await fetch("https://api.telegram.org/bot" + TELEGRAM_BOT_TOKEN + "/deleteMessage", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ chat_id: fwdTarget, message_id: fwdMsg.message_id }) });
+                } catch (e2) {
+                }
+                if (freshFileId) {
+                  var freshFi = await botAPI.getFile(freshFileId);
+                  mediaUrl = botAPI.getFileUrl(freshFi.file_path);
+                  DB.prepare("UPDATE songs SET tg_file_id=? WHERE id=?").bind(freshFileId, song.id).run().catch(function() {
+                  });
+                }
+              }
+            } catch (e2) {
+            }
+          }
+          if (!mediaUrl && song.suno_audio_url && song.suno_audio_url.indexOf("suno") !== -1) mediaUrl = song.suno_audio_url;
           if (!mediaUrl && (song.podcast_audio_url || PODCAST_URLS[song.id])) mediaUrl = song.podcast_audio_url || PODCAST_URLS[song.id];
+          if (!mediaUrl && song.tg_video_url && !song.tg_video_url.startsWith("local:")) mediaUrl = song.tg_video_url;
           if (!mediaUrl) return err("No media", 404);
           var resp = new Response(null, { status: 302, headers: { "Location": mediaUrl, "Access-Control-Allow-Origin": "*", "Cache-Control": "no-cache" } });
           return addSecurityHeaders(resp);
@@ -1896,7 +1924,8 @@ var worker_default = {
       var ct = mimeTypes[ext] || "application/octet-stream";
       var isHtml = ext === ".html" || ext === ".htm";
       var isAdmin = key.indexOf("admin") !== -1;
-      var csp = "default-src 'self'; style-src 'self' 'unsafe-inline'; script-src 'self'" + (isAdmin ? " https://challenges.cloudflare.com" : "") + "; img-src 'self' https://api.telegram.org https://cdn1.suno.ai https://cdn2.suno.ai https://poetry.shemaxpoetry.workers.dev https://shemaxpoetry.website.yandexcloud.net https://raw.githubusercontent.com data:; media-src 'self' https://api.telegram.org https://cdn1.suno.ai https://cdn2.suno.ai https://poetry.shemaxpoetry.workers.dev https://shemaxpoetry.website.yandexcloud.net https://raw.githubusercontent.com; connect-src 'self' https://poetry.shemaxpoetry.workers.dev https://cdn1.suno.ai https://shemaxpoetry.website.yandexcloud.net https://raw.githubusercontent.com" + (isAdmin ? " https://challenges.cloudflare.com" : "") + "; font-src 'self';" + (isAdmin ? " frame-src https://challenges.cloudflare.com;" : "");
+      var origins = url.origin + " https://poetry.shemaxpoetry.workers.dev https://poetry.shemax.workers.dev https://shemaxpoetry.website.yandexcloud.net https://api.telegram.org https://cdn1.suno.ai https://cdn2.suno.ai https://raw.githubusercontent.com";
+      var csp = "default-src 'self'; style-src 'self' 'unsafe-inline'; script-src 'self'" + (isAdmin ? " https://challenges.cloudflare.com" : "") + "; img-src 'self' " + origins + " data:; media-src 'self' " + origins + "; connect-src 'self' " + origins + (isAdmin ? " https://challenges.cloudflare.com" : "") + "; font-src 'self';" + (isAdmin ? " frame-src https://challenges.cloudflare.com;" : "");
       if (!isHtml) csp = "";
       var resp = new Response(value, { headers: { "Content-Type": ct, "Cache-Control": "no-cache, must-revalidate" } });
       if (csp) resp.headers.set("Content-Security-Policy", csp);
