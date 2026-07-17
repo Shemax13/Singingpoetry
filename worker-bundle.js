@@ -236,7 +236,7 @@ function db(e) {
     async upsertSong(s) {
       if (s.id) {
         var cols = [], vals = [];
-        var allowedCols = { title: 1, lyrics: 1, tg_video_url: 1, tg_file_id: 1, tg_message_url: 1, suno_audio_url: 1, suno_cover_url: 1, suno_track_url: 1, cover_url: 1, language: 1, order_index: 1, telegram_message_id: 1, published_at: 1 };
+        var allowedCols = { title: 1, full_title: 1, file_name: 1, lyrics: 1, tg_video_url: 1, tg_file_id: 1, tg_message_url: 1, suno_audio_url: 1, suno_cover_url: 1, suno_track_url: 1, cover_url: 1, language: 1, order_index: 1, telegram_message_id: 1, published_at: 1 };
         for (var k in allowedCols) {
           if (s[k] !== void 0) {
             cols.push(k + "=?");
@@ -254,7 +254,7 @@ function db(e) {
         await stmt.run();
         return this.getSong(s.id);
       }
-      var r = await e.prepare("INSERT INTO songs(title,lyrics,tg_video_url,tg_file_id,tg_message_url,suno_audio_url,suno_cover_url,suno_track_url,cover_url,visible,language,order_index,telegram_message_id,published_at) VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,?)").bind(s.title, s.lyrics || null, s.tg_video_url || null, s.tg_file_id || null, s.tg_message_url || null, s.suno_audio_url || null, s.suno_cover_url || null, s.suno_track_url || null, s.cover_url || null, 1, s.language || "ru", s.order_index || 0, s.telegram_message_id || null, s.published_at || null).run();
+      var r = await e.prepare("INSERT INTO songs(title,full_title,file_name,lyrics,tg_video_url,tg_file_id,tg_message_url,suno_audio_url,suno_cover_url,suno_track_url,cover_url,visible,language,order_index,telegram_message_id,published_at) VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)").bind(s.title, s.full_title || s.title, s.file_name || null, s.lyrics || null, s.tg_video_url || null, s.tg_file_id || null, s.tg_message_url || null, s.suno_audio_url || null, s.suno_cover_url || null, s.suno_track_url || null, s.cover_url || null, 1, s.language || "ru", s.order_index || 0, s.telegram_message_id || null, s.published_at || null).run();
       return this.getSong(r.meta.last_row_id);
     },
     async deleteSong(id) {
@@ -394,7 +394,7 @@ function db(e) {
       if (!review) return;
       if (status === "approved") {
         var col = review.field;
-        if (["title", "lyrics", "suno_audio_url", "suno_cover_url", "suno_track_url", "cover_url", "language"].indexOf(col) !== -1) {
+        if (["title", "full_title", "file_name", "lyrics", "suno_audio_url", "suno_cover_url", "suno_track_url", "cover_url", "language"].indexOf(col) !== -1) {
           await e.prepare("UPDATE songs SET " + col + "=?,updated_at=datetime('now') WHERE id=?").bind(review.new_value, review.song_id).run();
         }
       }
@@ -800,6 +800,47 @@ var worker_default = {
           var msgIdForDedup = p.forward_from_msg_id || p.tg_msg_id;
           var isSong = (p.msg_type === "video" || p.msg_type === "audio" || p.msg_type === "document" && p.mime_type && p.mime_type.startsWith("audio/")) && p.file_id;
           var songObj = null;
+          if (isSong && (p.msg_type === "audio" || p.msg_type === "voice") && p.text_content && /подкаст/i.test(p.text_content)) {
+            try {
+              var fileInfo;
+              try {
+                fileInfo = await botAPI.getFile(p.file_id);
+              } catch (e2) {
+                fileInfo = null;
+              }
+              var podcastUrl = fileInfo ? botAPI.getFileUrl(fileInfo.file_path) : null;
+              var titleMatch = p.text_content.match(/["\u00ab]([^"\u00bb]+)["\u00bb]/);
+              var podcastName = titleMatch ? titleMatch[1].trim() : null;
+              var podcastDesc = p.text_content.replace(/.*подкаст/i, "").trim().substring(0, 200);
+              var updated = false;
+              if (podcastName) {
+                var rows = await DB.prepare("SELECT id, podcast_name FROM songs WHERE title LIKE ? OR full_title LIKE ?").bind("%" + podcastName + "%", "%" + podcastName + "%").all();
+                if (rows.results && rows.results.length > 0) {
+                  var songId = rows.results[0].id;
+                  var sets = ["podcast_link=?"];
+                  var params = [podcastUrl || p.file_id];
+                  if (p.file_id) {
+                    sets.push("podcast_file_id=?");
+                    params.push(p.file_id);
+                  }
+                  if (podcastDesc && !rows.results[0].podcast_name) {
+                    sets.push("podcast_name=?");
+                    params.push(podcastDesc);
+                  }
+                  params.push(songId);
+                  await DB.prepare("UPDATE songs SET " + sets.join(",") + " WHERE id=?").bind(...params).run();
+                  slog("info", "webhook_podcast_matched", { songId, podcastName, requestId });
+                  updated = true;
+                }
+              }
+              if (!updated) {
+                slog("info", "webhook_podcast_unmatched", { text: (p.text_content || "").substring(0, 100), requestId });
+              }
+              return json({ ok: true });
+            } catch (pe) {
+              slog("error", "webhook_podcast_error", { error: pe.message, requestId });
+            }
+          }
           if (isSong) {
             if (await d.getByTgMsg(msgIdForDedup)) {
               slog("info", "webhook_dup_song", { tgMsgId: msgIdForDedup, requestId });
