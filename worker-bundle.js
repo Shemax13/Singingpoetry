@@ -757,6 +757,10 @@ var worker_default = {
           return err("Upload failed");
         }
       }
+      if (method === "GET" && path === "/api/debug-webhook") {
+        var debugData = await STATIC.get("debug:wh:last", { type: "json" }) || [];
+        return json({ ok: true, data: debugData });
+      }
       if (method === "POST" && path === "/api/webhook") {
         try {
           if (rateLimit("rl:wh:" + url.searchParams.get("secret") || "anon", 30, RATE_LIMIT_WINDOW)) return json({ ok: true });
@@ -777,7 +781,15 @@ var worker_default = {
             return json({ ok: true });
           }
           var p = parseMsgFull(update);
-          slog("info", "webhook_received", { chatType: p ? p.chat_type : null, msgType: p ? p.msg_type : null, text: p ? (p.text_content || "").substring(0, 100) : null, fileId: p ? p.file_id : null, fwdChat: p ? p.forward_from_chat_id : null, fwdMsg: p ? p.forward_from_msg_id : null, requestId });
+          try {
+            var debugKey = "debug:wh:last";
+            var existing = await STATIC.get(debugKey, { type: "json" }) || [];
+            existing.unshift({ ts: (/* @__PURE__ */ new Date()).toISOString(), chatType: p ? p.chat_type : null, msgType: p ? p.msg_type : null, text: p ? (p.text_content || "").substring(0, 200) : null, fileId: p ? p.file_id : null, fwdChat: p ? p.forward_from_chat_id : null, fwdMsg: p ? p.forward_from_msg_id : null, fileName: p ? p.file_name : null, hasAudio: p ? !!(update.message && update.message.audio) : null });
+            if (existing.length > 5) existing = existing.slice(0, 5);
+            await STATIC.put(debugKey, JSON.stringify(existing), { expirationTtl: 3600 });
+          } catch (debugErr) {
+            slog("error", "debug_store_failed", { error: debugErr.message, requestId });
+          }
           if (!p || !p.tg_msg_id) return json({ ok: true });
           if (!p.chat_type || !p.text_content || p.text_content.length > 5e3) p.text_content = (p.text_content || "").substring(0, 5e3);
           var existingMsg = await d.getMessageByChatAndMsg(p.chat_id, p.tg_msg_id);
