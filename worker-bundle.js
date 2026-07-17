@@ -539,8 +539,8 @@ var worker_default = {
     var path = url.pathname;
     var method = request.method;
     var requestId = crypto.randomUUID ? crypto.randomUUID().slice(0, 8) : Date.now().toString(36);
-    function slog(level, msg2, data) {
-      console.log(JSON.stringify({ service: "poetry", level, msg: msg2, requestId, ts: (/* @__PURE__ */ new Date()).toISOString(), data: data || {} }));
+    function slog(level, msg2, data2) {
+      console.log(JSON.stringify({ service: "poetry", level, msg: msg2, requestId, ts: (/* @__PURE__ */ new Date()).toISOString(), data: data2 || {} }));
     }
     if (method === "OPTIONS") return new Response(null, { headers: path.startsWith("/api/admin/") ? corsRestricted : cors });
     if (path.startsWith("/api/")) {
@@ -760,6 +760,16 @@ var worker_default = {
       if (method === "GET" && path === "/api/debug-webhook") {
         var debugData = await STATIC.get("debug:wh:last", { type: "json" }) || [];
         return json({ ok: true, data: debugData });
+      }
+      if (method === "GET" && path === "/api/debug-getupdates") {
+        if (!await isAuth(request, DB)) return err("Unauthorized", 401);
+        var ac = new AbortController();
+        setTimeout(function() {
+          ac.abort();
+        }, 1e4);
+        var resp = await fetch("https://api.telegram.org/bot" + TELEGRAM_BOT_TOKEN + "/getUpdates?limit=10&timeout=0", { signal: ac.signal });
+        var data = await resp.json();
+        return json({ ok: true, data });
       }
       if (method === "POST" && path === "/api/webhook") {
         try {
