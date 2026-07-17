@@ -777,6 +777,7 @@ var worker_default = {
             return json({ ok: true });
           }
           var p = parseMsgFull(update);
+          slog("info", "webhook_received", { chatType: p ? p.chat_type : null, msgType: p ? p.msg_type : null, text: p ? (p.text_content || "").substring(0, 100) : null, fileId: p ? p.file_id : null, fwdChat: p ? p.forward_from_chat_id : null, fwdMsg: p ? p.forward_from_msg_id : null, requestId });
           if (!p || !p.tg_msg_id) return json({ ok: true });
           if (!p.chat_type || !p.text_content || p.text_content.length > 5e3) p.text_content = (p.text_content || "").substring(0, 5e3);
           var existingMsg = await d.getMessageByChatAndMsg(p.chat_id, p.tg_msg_id);
