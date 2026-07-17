@@ -1033,8 +1033,9 @@ var worker_default = {
             if (whUrl.length > 500) return err("Invalid URL", 400);
             var meResp = await (await fetch(tgBase + "/getMe")).json();
             if (!meResp.ok) return secureJSON({ ok: true, data: { error: "Bot token invalid" } });
+            await fetch(tgBase + "/deleteWebhook", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({}) });
             var tgResp = await (await fetch(tgBase + "/setWebhook", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ url: whUrl, allowed_updates: ["message", "channel_post"] }) })).json();
-            return secureJSON({ ok: true, data: { me: meResp.result, webhook: tgResp } });
+            return secureJSON({ ok: true, data: { me: meResp.result, webhook: tgResp, url: whUrl } });
           } catch (e2) {
             return err("Webhook setup failed");
           }
