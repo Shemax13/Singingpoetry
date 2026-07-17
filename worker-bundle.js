@@ -1029,7 +1029,7 @@ var worker_default = {
         if (method === "POST" && path === "/api/admin/setup-webhook") {
           try {
             var tgBase = "https://api.telegram.org/bot" + TELEGRAM_BOT_TOKEN;
-            var whUrl = url.searchParams.get("url") || "https://poetry.shemaxpoetry.workers.dev/api/webhook";
+            var whUrl = url.searchParams.get("url") || "https://poetry.shemaxpoetry.workers.dev/api/webhook" + (WEBHOOK_SECRET ? "?secret=" + WEBHOOK_SECRET : "");
             if (whUrl.length > 500) return err("Invalid URL", 400);
             var meResp = await (await fetch(tgBase + "/getMe")).json();
             if (!meResp.ok) return secureJSON({ ok: true, data: { error: "Bot token invalid" } });

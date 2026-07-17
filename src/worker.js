@@ -285,6 +285,41 @@ export default {
           var msgIdForDedup = p.forward_from_msg_id || p.tg_msg_id;
           var isSong = (p.msg_type === "video" || p.msg_type === "audio" || (p.msg_type === "document" && p.mime_type && p.mime_type.startsWith("audio/"))) && p.file_id;
           var songObj = null;
+
+          // Podcast audio detection: audio/voice with "подкаст" in caption → match to existing song
+          if (isSong && (p.msg_type === "audio" || p.msg_type === "voice") && p.text_content && /подкаст/i.test(p.text_content)) {
+            try {
+              var fileInfo;
+              try { fileInfo = await botAPI.getFile(p.file_id); } catch (e) { fileInfo = null; }
+              var podcastUrl = fileInfo ? botAPI.getFileUrl(fileInfo.file_path) : null;
+              // Extract song title from quotes in the caption
+              var titleMatch = p.text_content.match(/["\u00ab]([^"\u00bb]+)["\u00bb]/);
+              var podcastName = titleMatch ? titleMatch[1].trim() : null;
+              // Also extract full podcast name (text after "подкаст")
+              var podcastDesc = p.text_content.replace(/.*подкаст/i, '').trim().substring(0, 200);
+              var updated = false;
+              if (podcastName) {
+                // Find song by title
+                var rows = await DB.prepare("SELECT id, podcast_name FROM songs WHERE title LIKE ? OR full_title LIKE ?").bind("%" + podcastName + "%", "%" + podcastName + "%").all();
+                if (rows.results && rows.results.length > 0) {
+                  var songId = rows.results[0].id;
+                  var sets = ["podcast_link=?"];
+                  var params = [podcastUrl || p.file_id];
+                  if (p.file_id) { sets.push("podcast_file_id=?"); params.push(p.file_id); }
+                  if (podcastDesc && !rows.results[0].podcast_name) { sets.push("podcast_name=?"); params.push(podcastDesc); }
+                  params.push(songId);
+                  await DB.prepare("UPDATE songs SET " + sets.join(",") + " WHERE id=?").bind(...params).run();
+                  slog("info", "webhook_podcast_matched", { songId: songId, podcastName: podcastName, requestId: requestId });
+                  updated = true;
+                }
+              }
+              if (!updated) {
+                slog("info", "webhook_podcast_unmatched", { text: (p.text_content || "").substring(0, 100), requestId: requestId });
+              }
+              return json({ ok: true });
+            } catch (pe) { slog("error", "webhook_podcast_error", { error: pe.message, requestId: requestId }); }
+          }
+
           if (isSong) {
             // Dedup: skip if song already exists for this telegram message
             if (await d.getByTgMsg(msgIdForDedup)) {
@@ -454,7 +489,7 @@ export default {
         if (method === "POST" && path === "/api/admin/setup-webhook") {
           try {
             var tgBase = "https://api.telegram.org/bot" + TELEGRAM_BOT_TOKEN;
-            var whUrl = url.searchParams.get("url") || "https://poetry.shemaxpoetry.workers.dev/api/webhook";
+            var whUrl = url.searchParams.get("url") || ("https://poetry.shemaxpoetry.workers.dev/api/webhook" + (WEBHOOK_SECRET ? "?secret=" + WEBHOOK_SECRET : ""));
             if (whUrl.length > 500) return err("Invalid URL", 400);
             var meResp = await (await fetch(tgBase + "/getMe")).json();
             if (!meResp.ok) return secureJSON({ ok: true, data: { error: "Bot token invalid" } });
