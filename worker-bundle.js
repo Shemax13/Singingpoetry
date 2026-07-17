@@ -1026,6 +1026,15 @@ var worker_default = {
           }
           return secureJSON({ ok: true, data: { resolved, remaining: (rows.results || []).length - resolved } });
         }
+        if (method === "GET" && path === "/api/admin/webhook-info") {
+          try {
+            var tgBase2 = "https://api.telegram.org/bot" + TELEGRAM_BOT_TOKEN;
+            var info = await (await fetch(tgBase2 + "/getWebhookInfo")).json();
+            return secureJSON({ ok: true, data: info.result || info });
+          } catch (e2) {
+            return err("Failed: " + e2.message);
+          }
+        }
         if (method === "POST" && path === "/api/admin/setup-webhook") {
           try {
             var tgBase = "https://api.telegram.org/bot" + TELEGRAM_BOT_TOKEN;

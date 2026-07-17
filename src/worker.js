@@ -486,6 +486,15 @@ export default {
           return secureJSON({ ok: true, data: { resolved: resolved, remaining: (rows.results || []).length - resolved } });
         }
 
+        // Debug: get webhook info from Telegram
+        if (method === "GET" && path === "/api/admin/webhook-info") {
+          try {
+            var tgBase2 = "https://api.telegram.org/bot" + TELEGRAM_BOT_TOKEN;
+            var info = await (await fetch(tgBase2 + "/getWebhookInfo")).json();
+            return secureJSON({ ok: true, data: info.result || info });
+          } catch (e) { return err("Failed: " + e.message); }
+        }
+
         if (method === "POST" && path === "/api/admin/setup-webhook") {
           try {
             var tgBase = "https://api.telegram.org/bot" + TELEGRAM_BOT_TOKEN;
