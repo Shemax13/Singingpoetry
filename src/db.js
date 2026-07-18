@@ -27,7 +27,7 @@ export function db(e) {
     async upsertSong(s) {
       if (s.id) {
         var cols = [], vals = [];
-        var allowedCols = { title: 1, lyrics: 1, tg_video_url: 1, tg_file_id: 1, tg_message_url: 1, suno_audio_url: 1, suno_cover_url: 1, suno_track_url: 1, cover_url: 1, language: 1, order_index: 1, telegram_message_id: 1, published_at: 1 };
+        var allowedCols = { title: 1, full_title: 1, file_name: 1, lyrics: 1, tg_video_url: 1, tg_file_id: 1, tg_message_url: 1, suno_audio_url: 1, suno_cover_url: 1, suno_track_url: 1, cover_url: 1, language: 1, order_index: 1, telegram_message_id: 1, published_at: 1 };
         for (var k in allowedCols) {
           if (s[k] !== undefined) {
             cols.push(k + "=?");
@@ -40,7 +40,7 @@ export function db(e) {
         var stmt = e.prepare("UPDATE songs SET " + cols.join(",") + ",updated_at=datetime('now') WHERE id=?"); stmt.bind(...vals); await stmt.run();
         return this.getSong(s.id);
       }
-      var r = await e.prepare("INSERT INTO songs(title,lyrics,tg_video_url,tg_file_id,tg_message_url,suno_audio_url,suno_cover_url,suno_track_url,cover_url,visible,language,order_index,telegram_message_id,published_at) VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,?)").bind(s.title, s.lyrics || null, s.tg_video_url || null, s.tg_file_id || null, s.tg_message_url || null, s.suno_audio_url || null, s.suno_cover_url || null, s.suno_track_url || null, s.cover_url || null, 1, s.language || "ru", s.order_index || 0, s.telegram_message_id || null, s.published_at || null).run();
+      var r = await e.prepare("INSERT INTO songs(title,full_title,file_name,lyrics,tg_video_url,tg_file_id,tg_message_url,suno_audio_url,suno_cover_url,suno_track_url,cover_url,visible,language,order_index,telegram_message_id,published_at) VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)").bind(s.title, s.full_title || s.title, s.file_name || null, s.lyrics || null, s.tg_video_url || null, s.tg_file_id || null, s.tg_message_url || null, s.suno_audio_url || null, s.suno_cover_url || null, s.suno_track_url || null, s.cover_url || null, 1, s.language || "ru", s.order_index || 0, s.telegram_message_id || null, s.published_at || null).run();
       return this.getSong(r.meta.last_row_id);
     },
     async deleteSong(id) {
@@ -154,7 +154,7 @@ export function db(e) {
       if (!review) return;
       if (status === 'approved') {
         var col = review.field;
-        if (['title', 'lyrics', 'suno_audio_url', 'suno_cover_url', 'suno_track_url', 'cover_url', 'language'].indexOf(col) !== -1) {
+        if (['title', 'full_title', 'file_name', 'lyrics', 'suno_audio_url', 'suno_cover_url', 'suno_track_url', 'cover_url', 'language'].indexOf(col) !== -1) {
           await e.prepare("UPDATE songs SET " + col + "=?,updated_at=datetime('now') WHERE id=?").bind(review.new_value, review.song_id).run();
         }
       }

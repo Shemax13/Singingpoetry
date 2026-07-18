@@ -3,8 +3,19 @@ dist-functions/
 .wrangler/
 *.log
 .env
+.env.*
 scripts/deploy*.mjs
 /tmp/
 backups/
 dist/
 SESSION.md
+deployer-v6.js
+
+# Secrets — never commit
+DEV_HISTORY.md
+*sa-key*.json
+*secret*.json
+*.key
+credentials*.json
+songs_export.csv
+.~lock.*
