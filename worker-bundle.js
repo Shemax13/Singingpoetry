@@ -835,16 +835,10 @@ var worker_default = {
                 fileInfo = null;
               }
               var podcastUrl = fileInfo ? botAPI.getFileUrl(fileInfo.file_path) : null;
-              var titleMatch = (p.text_content || "").match(/["\u00ab]([^"\u00bb]+)["\u00bb]/);
-              var podcastName = titleMatch ? titleMatch[1].trim() : null;
-              if (!podcastName && p.file_name) {
-                var fnClean = p.file_name.replace(/\.[^.]+$/, "").replace(/_/g, " ").trim();
-                podcastName = fnClean || null;
-              }
               var podcastDesc = (p.text_content || "").replace(/.*подкаст/i, "").trim().substring(0, 200);
               var updated = false;
-              if (podcastName) {
-                var rows = await DB.prepare("SELECT id, podcast_name FROM songs WHERE title LIKE ? OR full_title LIKE ?").bind("%" + podcastName + "%", "%" + podcastName + "%").all();
+              if (p.file_name) {
+                var rows = await DB.prepare("SELECT id, podcast_name FROM songs WHERE podcast_file=?").bind(p.file_name).all();
                 if (rows.results && rows.results.length > 0) {
                   var songId = rows.results[0].id;
                   var sets = ["podcast_link=?"];
@@ -859,12 +853,40 @@ var worker_default = {
                   }
                   params.push(songId);
                   await DB.prepare("UPDATE songs SET " + sets.join(",") + " WHERE id=?").bind(...params).run();
-                  slog("info", "webhook_podcast_matched", { songId, podcastName, requestId });
+                  slog("info", "webhook_podcast_matched_file", { songId, file: p.file_name, requestId });
                   updated = true;
                 }
               }
               if (!updated) {
-                slog("info", "webhook_podcast_unmatched", { text: (p.text_content || "").substring(0, 100), requestId });
+                var titleMatch = (p.text_content || "").match(/["\u00ab]([^"\u00bb]+)["\u00bb]/);
+                var podcastName = titleMatch ? titleMatch[1].trim() : null;
+                if (!podcastName && p.file_name) {
+                  var fnClean = p.file_name.replace(/\.[^.]+$/, "").replace(/_/g, " ").trim();
+                  podcastName = fnClean || null;
+                }
+                if (podcastName) {
+                  var rows2 = await DB.prepare("SELECT id, podcast_name FROM songs WHERE title LIKE ? OR full_title LIKE ?").bind("%" + podcastName + "%", "%" + podcastName + "%").all();
+                  if (rows2.results && rows2.results.length > 0) {
+                    var songId = rows2.results[0].id;
+                    var sets = ["podcast_link=?"];
+                    var params = [podcastUrl || p.file_id];
+                    if (p.file_id) {
+                      sets.push("podcast_file_id=?");
+                      params.push(p.file_id);
+                    }
+                    if (podcastDesc && !rows2.results[0].podcast_name) {
+                      sets.push("podcast_name=?");
+                      params.push(podcastDesc);
+                    }
+                    params.push(songId);
+                    await DB.prepare("UPDATE songs SET " + sets.join(",") + " WHERE id=?").bind(...params).run();
+                    slog("info", "webhook_podcast_matched_title", { songId, podcastName, requestId });
+                    updated = true;
+                  }
+                }
+              }
+              if (!updated) {
+                slog("info", "webhook_podcast_unmatched", { file: p.file_name || "", text: (p.text_content || "").substring(0, 100), requestId });
               }
               return json({ ok: true });
             } catch (pe) {

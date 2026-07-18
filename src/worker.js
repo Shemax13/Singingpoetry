@@ -246,6 +246,21 @@ export default {
         }
       }
 
+      // -- Debug: read last webhook events from KV --
+      if (method === "GET" && path === "/api/debug-webhook") {
+        var debugData = await STATIC.get("debug:wh:last", { type: "json" }) || [];
+        return json({ ok: true, data: debugData });
+      }
+      // -- Debug: check getUpdates for pending messages --
+      if (method === "GET" && path === "/api/debug-getupdates") {
+        if (!await isAuth(request, DB)) return err("Unauthorized", 401);
+        var ac = new AbortController();
+        setTimeout(function() { ac.abort(); }, 10000);
+        var resp = await fetch("https://api.telegram.org/bot" + TELEGRAM_BOT_TOKEN + "/getUpdates?limit=10&timeout=0", { signal: ac.signal });
+        var data = await resp.json();
+        return json({ ok: true, data: data });
+      }
+
       // -- Webhook --
       if (method === "POST" && path === "/api/webhook") {
         try {
@@ -263,6 +278,14 @@ export default {
           var update;
           try { update = JSON.parse(raw); } catch (e) { return json({ ok: true }); }
           var p = parseMsgFull(update);
+          // KV-based debug: store last 5 webhook events so we can query them via GET /api/debug-webhook
+          try {
+            var debugKey = "debug:wh:last";
+            var existing = await STATIC.get(debugKey, { type: "json" }) || [];
+            existing.unshift({ ts: new Date().toISOString(), chatType: p ? p.chat_type : null, msgType: p ? p.msg_type : null, text: p ? (p.text_content || "").substring(0, 200) : null, fileId: p ? p.file_id : null, fwdChat: p ? p.forward_from_chat_id : null, fwdMsg: p ? p.forward_from_msg_id : null, fileName: p ? p.file_name : null, hasAudio: p ? !!(update.message && update.message.audio) : null });
+            if (existing.length > 5) existing = existing.slice(0, 5);
+            await STATIC.put(debugKey, JSON.stringify(existing), { expirationTtl: 3600 });
+          } catch (debugErr) { slog("error", "debug_store_failed", { error: debugErr.message, requestId: requestId }); }
           if (!p || !p.tg_msg_id) return json({ ok: true });
           if (!p.chat_type || !p.text_content || p.text_content.length > 5000) p.text_content = (p.text_content || "").substring(0, 5000);
 
@@ -286,21 +309,22 @@ export default {
           var isSong = (p.msg_type === "video" || p.msg_type === "audio" || (p.msg_type === "document" && p.mime_type && p.mime_type.startsWith("audio/"))) && p.file_id;
           var songObj = null;
 
-          // Podcast audio detection: audio/voice with "подкаст" in caption → match to existing song
-          if (isSong && (p.msg_type === "audio" || p.msg_type === "voice") && p.text_content && /подкаст/i.test(p.text_content)) {
+          // Podcast audio detection: audio forwarded from known sources → match to existing song
+          // Triggers on: (1) caption contains "подкаст", OR (2) forwarded from podcast channels, OR (3) filename matches known podcast patterns
+          var isPodcastFwd = isSong && (p.msg_type === "audio" || p.msg_type === "voice") && p.forward_from_chat_id && (p.forward_from_chat_id === "@shemaxpoetry" || p.forward_from_chat_id === "@ShemaxPoetryFreeChat");
+          var hasPodcastCaption = isSong && p.text_content && /подкаст/i.test(p.text_content);
+          var hasPodcastFilename = isSong && p.file_name && /подкаст|podcast/i.test(p.file_name);
+          if (isPodcastFwd || hasPodcastCaption || hasPodcastFilename) {
             try {
               var fileInfo;
               try { fileInfo = await botAPI.getFile(p.file_id); } catch (e) { fileInfo = null; }
               var podcastUrl = fileInfo ? botAPI.getFileUrl(fileInfo.file_path) : null;
-              // Extract song title from quotes in the caption
-              var titleMatch = p.text_content.match(/["\u00ab]([^"\u00bb]+)["\u00bb]/);
-              var podcastName = titleMatch ? titleMatch[1].trim() : null;
-              // Also extract full podcast name (text after "подкаст")
-              var podcastDesc = p.text_content.replace(/.*подкаст/i, '').trim().substring(0, 200);
+              // Extract full podcast name (text after "подкаст") from caption
+              var podcastDesc = (p.text_content || "").replace(/.*подкаст/i, '').trim().substring(0, 200);
               var updated = false;
-              if (podcastName) {
-                // Find song by title
-                var rows = await DB.prepare("SELECT id, podcast_name FROM songs WHERE title LIKE ? OR full_title LIKE ?").bind("%" + podcastName + "%", "%" + podcastName + "%").all();
+              // Strategy 1: Match by podcast_file column (exact filename match — most reliable)
+              if (p.file_name) {
+                var rows = await DB.prepare("SELECT id, podcast_name FROM songs WHERE podcast_file=?").bind(p.file_name).all();
                 if (rows.results && rows.results.length > 0) {
                   var songId = rows.results[0].id;
                   var sets = ["podcast_link=?"];
@@ -309,12 +333,35 @@ export default {
                   if (podcastDesc && !rows.results[0].podcast_name) { sets.push("podcast_name=?"); params.push(podcastDesc); }
                   params.push(songId);
                   await DB.prepare("UPDATE songs SET " + sets.join(",") + " WHERE id=?").bind(...params).run();
-                  slog("info", "webhook_podcast_matched", { songId: songId, podcastName: podcastName, requestId: requestId });
+                  slog("info", "webhook_podcast_matched_file", { songId: songId, file: p.file_name, requestId: requestId });
                   updated = true;
                 }
               }
+              // Strategy 2: Match by title from caption quotes
               if (!updated) {
-                slog("info", "webhook_podcast_unmatched", { text: (p.text_content || "").substring(0, 100), requestId: requestId });
+                var titleMatch = (p.text_content || "").match(/["\u00ab]([^"\u00bb]+)["\u00bb]/);
+                var podcastName = titleMatch ? titleMatch[1].trim() : null;
+                if (!podcastName && p.file_name) {
+                  var fnClean = p.file_name.replace(/\.[^.]+$/, '').replace(/_/g, ' ').trim();
+                  podcastName = fnClean || null;
+                }
+                if (podcastName) {
+                  var rows2 = await DB.prepare("SELECT id, podcast_name FROM songs WHERE title LIKE ? OR full_title LIKE ?").bind("%" + podcastName + "%", "%" + podcastName + "%").all();
+                  if (rows2.results && rows2.results.length > 0) {
+                    var songId = rows2.results[0].id;
+                    var sets = ["podcast_link=?"];
+                    var params = [podcastUrl || p.file_id];
+                    if (p.file_id) { sets.push("podcast_file_id=?"); params.push(p.file_id); }
+                    if (podcastDesc && !rows2.results[0].podcast_name) { sets.push("podcast_name=?"); params.push(podcastDesc); }
+                    params.push(songId);
+                    await DB.prepare("UPDATE songs SET " + sets.join(",") + " WHERE id=?").bind(...params).run();
+                    slog("info", "webhook_podcast_matched_title", { songId: songId, podcastName: podcastName, requestId: requestId });
+                    updated = true;
+                  }
+                }
+              }
+              if (!updated) {
+                slog("info", "webhook_podcast_unmatched", { file: p.file_name || "", text: (p.text_content || "").substring(0, 100), requestId: requestId });
               }
               return json({ ok: true });
             } catch (pe) { slog("error", "webhook_podcast_error", { error: pe.message, requestId: requestId }); }
