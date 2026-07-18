@@ -318,7 +318,7 @@ export default {
             try {
               var fileInfo;
               try { fileInfo = await botAPI.getFile(p.file_id); } catch (e) { fileInfo = null; }
-              var podcastUrl = fileInfo ? botAPI.getFileUrl(fileInfo.file_path) : null;
+              var podcastUrl = fileInfo && fileInfo.file_path ? botAPI.getFileUrl(fileInfo.file_path) : null;
               // Extract full podcast name (text after "подкаст") from caption
               var podcastDesc = (p.text_content || "").replace(/.*подкаст/i, '').trim().substring(0, 200);
               var updated = false;
@@ -327,12 +327,15 @@ export default {
                 var rows = await DB.prepare("SELECT id, podcast_name FROM songs WHERE podcast_file=?").bind(p.file_name).all();
                 if (rows.results && rows.results.length > 0) {
                   var songId = rows.results[0].id;
-                  var sets = ["podcast_link=?"];
-                  var params = [podcastUrl || p.file_id];
+                  var sets = [];
+                  var params = [];
+                  if (podcastUrl) { sets.push("podcast_link=?"); params.push(podcastUrl); }
                   if (p.file_id) { sets.push("podcast_file_id=?"); params.push(p.file_id); }
                   if (podcastDesc && !rows.results[0].podcast_name) { sets.push("podcast_name=?"); params.push(podcastDesc); }
-                  params.push(songId);
-                  await DB.prepare("UPDATE songs SET " + sets.join(",") + " WHERE id=?").bind(...params).run();
+                  if (sets.length) {
+                    params.push(songId);
+                    await DB.prepare("UPDATE songs SET " + sets.join(",") + " WHERE id=?").bind(...params).run();
+                  }
                   slog("info", "webhook_podcast_matched_file", { songId: songId, file: p.file_name, requestId: requestId });
                   updated = true;
                 }
@@ -349,12 +352,15 @@ export default {
                   var rows2 = await DB.prepare("SELECT id, podcast_name FROM songs WHERE title LIKE ? OR full_title LIKE ?").bind("%" + podcastName + "%", "%" + podcastName + "%").all();
                   if (rows2.results && rows2.results.length > 0) {
                     var songId = rows2.results[0].id;
-                    var sets = ["podcast_link=?"];
-                    var params = [podcastUrl || p.file_id];
+                    var sets = [];
+                    var params = [];
+                    if (podcastUrl) { sets.push("podcast_link=?"); params.push(podcastUrl); }
                     if (p.file_id) { sets.push("podcast_file_id=?"); params.push(p.file_id); }
                     if (podcastDesc && !rows2.results[0].podcast_name) { sets.push("podcast_name=?"); params.push(podcastDesc); }
-                    params.push(songId);
-                    await DB.prepare("UPDATE songs SET " + sets.join(",") + " WHERE id=?").bind(...params).run();
+                    if (sets.length) {
+                      params.push(songId);
+                      await DB.prepare("UPDATE songs SET " + sets.join(",") + " WHERE id=?").bind(...params).run();
+                    }
                     slog("info", "webhook_podcast_matched_title", { songId: songId, podcastName: podcastName, requestId: requestId });
                     updated = true;
                   }
