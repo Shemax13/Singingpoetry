@@ -823,7 +823,10 @@ var worker_default = {
           var msgIdForDedup = p.forward_from_msg_id || p.tg_msg_id;
           var isSong = (p.msg_type === "video" || p.msg_type === "audio" || p.msg_type === "document" && p.mime_type && p.mime_type.startsWith("audio/")) && p.file_id;
           var songObj = null;
-          if (isSong && (p.msg_type === "audio" || p.msg_type === "voice") && p.text_content && /подкаст/i.test(p.text_content)) {
+          var isPodcastFwd = isSong && (p.msg_type === "audio" || p.msg_type === "voice") && p.forward_from_chat_id && (p.forward_from_chat_id === "@shemaxpoetry" || p.forward_from_chat_id === "@ShemaxPoetryFreeChat");
+          var hasPodcastCaption = isSong && p.text_content && /подкаст/i.test(p.text_content);
+          var hasPodcastFilename = isSong && p.file_name && /подкаст|podcast/i.test(p.file_name);
+          if (isPodcastFwd || hasPodcastCaption || hasPodcastFilename) {
             try {
               var fileInfo;
               try {
@@ -832,9 +835,13 @@ var worker_default = {
                 fileInfo = null;
               }
               var podcastUrl = fileInfo ? botAPI.getFileUrl(fileInfo.file_path) : null;
-              var titleMatch = p.text_content.match(/["\u00ab]([^"\u00bb]+)["\u00bb]/);
+              var titleMatch = (p.text_content || "").match(/["\u00ab]([^"\u00bb]+)["\u00bb]/);
               var podcastName = titleMatch ? titleMatch[1].trim() : null;
-              var podcastDesc = p.text_content.replace(/.*подкаст/i, "").trim().substring(0, 200);
+              if (!podcastName && p.file_name) {
+                var fnClean = p.file_name.replace(/\.[^.]+$/, "").replace(/_/g, " ").trim();
+                podcastName = fnClean || null;
+              }
+              var podcastDesc = (p.text_content || "").replace(/.*подкаст/i, "").trim().substring(0, 200);
               var updated = false;
               if (podcastName) {
                 var rows = await DB.prepare("SELECT id, podcast_name FROM songs WHERE title LIKE ? OR full_title LIKE ?").bind("%" + podcastName + "%", "%" + podcastName + "%").all();
