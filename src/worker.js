@@ -1362,7 +1362,7 @@ export default {
       var ct = mimeTypes[ext] || "application/octet-stream";
       var isHtml = ext === ".html" || ext === ".htm";
       var isAdmin = key.indexOf("admin") !== -1;
-      var origins = url.origin + " https://poetry.shemaxpoetry.workers.dev https://poetry.shemax.workers.dev https://shemaxpoetry.website.yandexcloud.net https://api.telegram.org https://cdn1.suno.ai https://cdn2.suno.ai https://raw.githubusercontent.com";
+      var origins = url.origin + " https://poetry.shemaxpoetry.workers.dev https://poetry.shemax.workers.dev https://shemaxpoetry.website.yandexcloud.net https://storage.yandexcloud.net https://api.telegram.org https://cdn1.suno.ai https://cdn2.suno.ai https://raw.githubusercontent.com";
       var csp = "default-src 'self'; style-src 'self' 'unsafe-inline'; script-src 'self'" +
         (isAdmin ? " https://challenges.cloudflare.com" : "") +
         "; img-src 'self' " + origins + " data:;" +
