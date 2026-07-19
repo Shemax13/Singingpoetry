@@ -12,7 +12,8 @@
     "test": "vitest run",
     "test:watch": "vitest",
     "lint": "eslint src/ public/js/",
-    "format": "prettier --write 'src/**/*.js' 'public/**/*.js' 'public/**/*.html' 'public/**/*.css'"
+    "format": "prettier --write 'src/**/*.js' 'public/**/*.js' 'public/**/*.html' 'public/**/*.css'",
+    "build": "npx esbuild src/worker.js --bundle --outfile=dist/worker-bundle.js --format=esm"
   },
   "devDependencies": {
     "eslint": "^9.0.0",

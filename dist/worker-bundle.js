@@ -1,6 +1,3 @@
-var __defProp = Object.defineProperty;
-var __name = (target, value) => __defProp(target, "name", { value, configurable: true });
-
 // src/utils.js
 async function safeJSON(req) {
   try {
@@ -9,7 +6,6 @@ async function safeJSON(req) {
     return null;
   }
 }
-__name(safeJSON, "safeJSON");
 var cors = {
   "Access-Control-Allow-Origin": "*",
   "Access-Control-Allow-Methods": "GET,POST,PUT,DELETE,OPTIONS",
@@ -23,7 +19,7 @@ var corsRestricted = {
   "Access-Control-Max-Age": "86400"
 };
 var secureHeaders = {
-  "Content-Security-Policy": "default-src 'self'; style-src 'self' 'unsafe-inline'; script-src 'self'; img-src 'self' https://api.telegram.org https://cdn1.suno.ai https://cdn2.suno.ai https://raw.githubusercontent.com data:; media-src 'self' https://api.telegram.org https://cdn1.suno.ai https://cdn2.suno.ai https://raw.githubusercontent.com; connect-src 'self' https://api.telegram.org https://cdn1.suno.ai https://raw.githubusercontent.com; font-src 'self'; frame-ancestors 'none'; form-action 'self'",
+  "Content-Security-Policy": "default-src 'self'; style-src 'self' 'unsafe-inline'; script-src 'self'; img-src 'self' https://api.telegram.org https://cdn1.suno.ai https://cdn2.suno.ai https://storage.yandexcloud.net https://raw.githubusercontent.com data:; media-src 'self' https://api.telegram.org https://cdn1.suno.ai https://cdn2.suno.ai https://storage.yandexcloud.net https://raw.githubusercontent.com; connect-src 'self' https://api.telegram.org https://cdn1.suno.ai https://raw.githubusercontent.com; font-src 'self'; frame-ancestors 'none'; form-action 'self'",
   "X-Content-Type-Options": "nosniff",
   "X-Frame-Options": "DENY",
   "Referrer-Policy": "strict-origin-when-cross-origin",
@@ -33,15 +29,12 @@ var secureHeaders = {
 function json(d, s) {
   return new Response(JSON.stringify(d), { status: s || 200, headers: Object.assign({}, cors, { "Content-Type": "application/json" }, secureHeaders) });
 }
-__name(json, "json");
 function err(s, c) {
   return json({ ok: false, error: s }, c || 500);
 }
-__name(err, "err");
 function htmlResponse(body, s) {
   return new Response(body, { status: s || 200, headers: Object.assign({ "Content-Type": "text/html; charset=utf-8" }, secureHeaders) });
 }
-__name(htmlResponse, "htmlResponse");
 var rateLimitStore = {};
 var RATE_LIMIT_WINDOW = 6e4;
 function rateLimit(key, maxRequests, windowMs) {
@@ -54,18 +47,15 @@ function rateLimit(key, maxRequests, windowMs) {
   entries.push(now);
   return false;
 }
-__name(rateLimit, "rateLimit");
 function rateLimitResponse(key, maxRequests, windowMs) {
   if (rateLimit(key, maxRequests, windowMs)) {
     return err("Too many requests. Try again later.", 429);
   }
   return null;
 }
-__name(rateLimitResponse, "rateLimitResponse");
 function secureJSON(d, s) {
   return new Response(JSON.stringify(d), { status: s || 200, headers: Object.assign({}, corsRestricted, { "Content-Type": "application/json" }, secureHeaders) });
 }
-__name(secureJSON, "secureJSON");
 function genToken() {
   var b = new Uint8Array(32);
   crypto.getRandomValues(b);
@@ -73,24 +63,15 @@ function genToken() {
     return x.toString(16).padStart(2, "0");
   }).join("");
 }
-__name(genToken, "genToken");
 function safeInt(v, d) {
   var n = parseInt(v, 10);
   return isNaN(n) ? d : n;
 }
-__name(safeInt, "safeInt");
 async function isAuth(req, DB) {
   var h = req.headers.get("Authorization");
   if (!h || !h.startsWith("Bearer ")) return false;
   return !!await DB.prepare("SELECT id FROM admin_sessions WHERE id=? AND expires_at>datetime('now')").bind(h.slice(7)).first();
 }
-__name(isAuth, "isAuth");
-function firstLine(caption) {
-  if (!caption) return "Untitled";
-  var s = caption.split("\n")[0];
-  return s ? s.trim() : "Untitled";
-}
-__name(firstLine, "firstLine");
 function sunoExtractUrls(text) {
   if (!text) return [];
   var urls = [];
@@ -103,7 +84,6 @@ function sunoExtractUrls(text) {
   }
   return urls;
 }
-__name(sunoExtractUrls, "sunoExtractUrls");
 var sunoFetchCache = /* @__PURE__ */ new Map();
 var SUNO_CACHE_TTL = 36e5;
 async function sunoFetch(url) {
@@ -123,7 +103,6 @@ async function sunoFetch(url) {
   sunoFetchCache.set(url, { ts: Date.now(), data: result });
   return result;
 }
-__name(sunoFetch, "sunoFetch");
 async function processSunoUrl(url) {
   try {
     var info = await sunoFetch(url);
@@ -133,7 +112,6 @@ async function processSunoUrl(url) {
     return null;
   }
 }
-__name(processSunoUrl, "processSunoUrl");
 function parseMsgFull(update) {
   if (!update) return null;
   var m = update.message || update.channel_post || update;
@@ -207,7 +185,6 @@ function parseMsgFull(update) {
   }
   return result;
 }
-__name(parseMsgFull, "parseMsgFull");
 var mimeTypes = {
   ".html": "text/html",
   ".css": "text/css",
@@ -259,7 +236,7 @@ function db(e) {
     async upsertSong(s) {
       if (s.id) {
         var cols = [], vals = [];
-        var allowedCols = { title: 1, lyrics: 1, tg_video_url: 1, tg_file_id: 1, suno_audio_url: 1, suno_cover_url: 1, suno_track_url: 1, cover_url: 1, language: 1, order_index: 1, telegram_message_id: 1, published_at: 1 };
+        var allowedCols = { title: 1, full_title: 1, file_name: 1, lyrics: 1, tg_video_url: 1, tg_file_id: 1, tg_message_url: 1, suno_audio_url: 1, suno_cover_url: 1, suno_track_url: 1, cover_url: 1, language: 1, order_index: 1, telegram_message_id: 1, published_at: 1 };
         for (var k in allowedCols) {
           if (s[k] !== void 0) {
             cols.push(k + "=?");
@@ -277,7 +254,7 @@ function db(e) {
         await stmt.run();
         return this.getSong(s.id);
       }
-      var r = await e.prepare("INSERT INTO songs(title,lyrics,tg_video_url,tg_file_id,suno_audio_url,suno_cover_url,suno_track_url,cover_url,visible,language,order_index,telegram_message_id,published_at) VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?)").bind(s.title, s.lyrics || null, s.tg_video_url || null, s.tg_file_id || null, s.suno_audio_url || null, s.suno_cover_url || null, s.suno_track_url || null, s.cover_url || null, 1, s.language || "ru", s.order_index || 0, s.telegram_message_id || null, s.published_at || null).run();
+      var r = await e.prepare("INSERT INTO songs(title,full_title,file_name,lyrics,tg_video_url,tg_file_id,tg_message_url,suno_audio_url,suno_cover_url,suno_track_url,cover_url,visible,language,order_index,telegram_message_id,published_at) VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)").bind(s.title, s.full_title || s.title, s.file_name || null, s.lyrics || null, s.tg_video_url || null, s.tg_file_id || null, s.tg_message_url || null, s.suno_audio_url || null, s.suno_cover_url || null, s.suno_track_url || null, s.cover_url || null, 1, s.language || "ru", s.order_index || 0, s.telegram_message_id || null, s.published_at || null).run();
       return this.getSong(r.meta.last_row_id);
     },
     async deleteSong(id) {
@@ -417,7 +394,7 @@ function db(e) {
       if (!review) return;
       if (status === "approved") {
         var col = review.field;
-        if (["title", "lyrics", "suno_audio_url", "suno_cover_url", "suno_track_url", "cover_url", "language"].indexOf(col) !== -1) {
+        if (["title", "full_title", "file_name", "lyrics", "suno_audio_url", "suno_cover_url", "suno_track_url", "cover_url", "language"].indexOf(col) !== -1) {
           await e.prepare("UPDATE songs SET " + col + "=?,updated_at=datetime('now') WHERE id=?").bind(review.new_value, review.song_id).run();
         }
       }
@@ -458,7 +435,6 @@ function db(e) {
     }
   };
 }
-__name(db, "db");
 
 // src/services.js
 function cappedMap(maxSize) {
@@ -477,7 +453,6 @@ function cappedMap(maxSize) {
   };
   return m;
 }
-__name(cappedMap, "cappedMap");
 var mediaCache = cappedMap(500);
 var CACHE_TTL = 6e5;
 function tg(token, kv) {
@@ -529,7 +504,6 @@ function tg(token, kv) {
     }
   };
 }
-__name(tg, "tg");
 
 // src/worker.js
 var secureHeaders2 = {
@@ -543,7 +517,6 @@ function addSecurityHeaders(resp) {
   for (var k in secureHeaders2) resp.headers.set(k, secureHeaders2[k]);
   return resp;
 }
-__name(addSecurityHeaders, "addSecurityHeaders");
 var PRIVACY_HTML = '<!DOCTYPE html><html lang="ru"><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1.0"><title>Shemaxpoetry \u2014 \u041F\u043E\u043B\u0438\u0442\u0438\u043A\u0430 \u043A\u043E\u043D\u0444\u0438\u0434\u0435\u043D\u0446\u0438\u0430\u043B\u044C\u043D\u043E\u0441\u0442\u0438</title><style>body{font-family:sans-serif;background:#0d0d14;color:#e8e6e3;max-width:720px;margin:0 auto;padding:40px 20px;line-height:1.6}h1{color:#d4a853}h2{color:#d4a853;font-size:1.2rem;margin-top:24px}a{color:#d4a853}</style></head><body><h1>\u041F\u043E\u043B\u0438\u0442\u0438\u043A\u0430 \u043A\u043E\u043D\u0444\u0438\u0434\u0435\u043D\u0446\u0438\u0430\u043B\u044C\u043D\u043E\u0441\u0442\u0438</h1><p>\u041F\u043E\u0441\u043B\u0435\u0434\u043D\u0435\u0435 \u043E\u0431\u043D\u043E\u0432\u043B\u0435\u043D\u0438\u0435: 6 \u0438\u044E\u043B\u044F 2026</p><h2>1. \u041A\u0430\u043A\u0438\u0435 \u0434\u0430\u043D\u043D\u044B\u0435 \u043C\u044B \u0441\u043E\u0431\u0438\u0440\u0430\u0435\u043C</h2><p>\u2014 \u0422\u0435\u043A\u0441\u0442\u044B \u0438 \u043C\u0435\u0434\u0438\u0430\u0444\u0430\u0439\u043B\u044B (\u0432\u0438\u0434\u0435\u043E, \u0430\u0443\u0434\u0438\u043E, \u0438\u0437\u043E\u0431\u0440\u0430\u0436\u0435\u043D\u0438\u044F) \u0438\u0437 Telegram-\u043A\u0430\u043D\u0430\u043B\u0430 @shemaxpoetry \u0438 \u0441\u0432\u044F\u0437\u0430\u043D\u043D\u043E\u0433\u043E \u0447\u0430\u0442\u0430.<br>\u2014 IP-\u0430\u0434\u0440\u0435\u0441 \u043F\u0440\u0438 \u0437\u0430\u043F\u0440\u043E\u0441\u0430\u0445 \u043A \u0441\u0430\u0439\u0442\u0443 (\u043E\u0431\u0440\u0430\u0431\u0430\u0442\u044B\u0432\u0430\u0435\u0442\u0441\u044F \u0430\u0432\u0442\u043E\u043C\u0430\u0442\u0438\u0447\u0435\u0441\u043A\u0438 \u0438\u043D\u0444\u0440\u0430\u0441\u0442\u0440\u0443\u043A\u0442\u0443\u0440\u043E\u0439 Cloudflare).<br>\u2014 \u0414\u0430\u043D\u043D\u044B\u0435 \u0434\u043B\u044F \u0432\u0445\u043E\u0434\u0430 \u0432 \u0430\u0434\u043C\u0438\u043D-\u043F\u0430\u043D\u0435\u043B\u044C (\u043F\u0430\u0440\u043E\u043B\u044C, Turnstile-\u0442\u043E\u043A\u0435\u043D) \u2014 \u043D\u0435 \u0445\u0440\u0430\u043D\u044F\u0442\u0441\u044F \u043F\u043E\u0441\u043B\u0435 \u043F\u0440\u043E\u0432\u0435\u0440\u043A\u0438.</p><h2>2. \u041A\u0430\u043A \u043C\u044B \u0438\u0441\u043F\u043E\u043B\u044C\u0437\u0443\u0435\u043C \u0434\u0430\u043D\u043D\u044B\u0435</h2><p>\u2014 \u0414\u043B\u044F \u043E\u0442\u043E\u0431\u0440\u0430\u0436\u0435\u043D\u0438\u044F \u043F\u0435\u0441\u0435\u043D, \u043F\u043E\u0434\u043A\u0430\u0441\u0442\u043E\u0432 \u0438 \u0441\u043E\u043F\u0443\u0442\u0441\u0442\u0432\u0443\u044E\u0449\u0435\u0433\u043E \u043A\u043E\u043D\u0442\u0435\u043D\u0442\u0430 \u043D\u0430 \u0441\u0430\u0439\u0442\u0435 poetry.shemaxpoetry.workers.dev.<br>\u2014 \u0414\u043B\u044F \u043E\u0431\u0435\u0441\u043F\u0435\u0447\u0435\u043D\u0438\u044F \u0431\u0435\u0437\u043E\u043F\u0430\u0441\u043D\u043E\u0441\u0442\u0438 (rate limiting, \u0437\u0430\u0449\u0438\u0442\u0430 \u043E\u0442 \u0431\u043E\u0442\u043E\u0432).</p><h2>3. \u0425\u0440\u0430\u043D\u0435\u043D\u0438\u0435 \u0434\u0430\u043D\u043D\u044B\u0445</h2><p>\u2014 \u0414\u0430\u043D\u043D\u044B\u0435 \u0445\u0440\u0430\u043D\u044F\u0442\u0441\u044F \u0432 Cloudflare D1 (\u0431\u0430\u0437\u0430 \u0434\u0430\u043D\u043D\u044B\u0445), Cloudflare KV (\u0444\u0440\u043E\u043D\u0442\u0435\u043D\u0434) \u0438 Cloudflare R2 (\u043C\u0435\u0434\u0438\u0430\u0444\u0430\u0439\u043B\u044B).<br>\u2014 \u0421\u0435\u0440\u0432\u0435\u0440\u044B \u0440\u0430\u0441\u043F\u043E\u043B\u043E\u0436\u0435\u043D\u044B \u0432 \u0434\u0430\u0442\u0430-\u0446\u0435\u043D\u0442\u0440\u0430\u0445 Cloudflare \u043F\u043E \u0432\u0441\u0435\u043C\u0443 \u043C\u0438\u0440\u0443.<br>\u2014 \u0421\u0440\u043E\u043A \u0445\u0440\u0430\u043D\u0435\u043D\u0438\u044F: \u043F\u043E\u043A\u0430 \u0441\u0430\u0439\u0442 \u0444\u0443\u043D\u043A\u0446\u0438\u043E\u043D\u0438\u0440\u0443\u0435\u0442. \u0414\u043B\u044F \u0443\u0434\u0430\u043B\u0435\u043D\u0438\u044F \u043E\u0431\u0440\u0430\u0442\u0438\u0442\u0435\u0441\u044C \u043A @shemax45 \u0432 Telegram.</p><h2>4. \u041F\u0435\u0440\u0435\u0434\u0430\u0447\u0430 \u0434\u0430\u043D\u043D\u044B\u0445 \u0442\u0440\u0435\u0442\u044C\u0438\u043C \u043B\u0438\u0446\u0430\u043C</h2><p>\u2014 \u041C\u044B \u043D\u0435 \u043F\u0440\u043E\u0434\u0430\u0451\u043C \u0438 \u043D\u0435 \u043F\u0435\u0440\u0435\u0434\u0430\u0451\u043C \u0434\u0430\u043D\u043D\u044B\u0435 \u0442\u0440\u0435\u0442\u044C\u0438\u043C \u043B\u0438\u0446\u0430\u043C.<br>\u2014 \u0418\u0441\u043F\u043E\u043B\u044C\u0437\u0443\u0435\u0442\u0441\u044F \u0438\u043D\u0444\u0440\u0430\u0441\u0442\u0440\u0443\u043A\u0442\u0443\u0440\u0430 Cloudflare (\u043E\u0431\u0440\u0430\u0431\u043E\u0442\u043A\u0430 \u0437\u0430\u043F\u0440\u043E\u0441\u043E\u0432, \u0445\u0440\u0430\u043D\u0435\u043D\u0438\u0435).<br>\u2014 \u041C\u0435\u0434\u0438\u0430\u0444\u0430\u0439\u043B\u044B \u043C\u043E\u0433\u0443\u0442 \u0437\u0430\u0433\u0440\u0443\u0436\u0430\u0442\u044C\u0441\u044F \u0441 Telegram CDN \u0438 GitHub raw.</p><h2>5. \u0412\u0430\u0448\u0438 \u043F\u0440\u0430\u0432\u0430 (GDPR / CCPA)</h2><p>\u2014 \u041F\u0440\u0430\u0432\u043E \u043D\u0430 \u0434\u043E\u0441\u0442\u0443\u043F: \u0437\u0430\u043F\u0440\u043E\u0441\u0438\u0442\u044C \u043A\u043E\u043F\u0438\u044E \u0432\u0430\u0448\u0438\u0445 \u0434\u0430\u043D\u043D\u044B\u0445 \u0447\u0435\u0440\u0435\u0437 @shemax45.<br>\u2014 \u041F\u0440\u0430\u0432\u043E \u043D\u0430 \u0443\u0434\u0430\u043B\u0435\u043D\u0438\u0435: \u043F\u043E\u0442\u0440\u0435\u0431\u043E\u0432\u0430\u0442\u044C \u0443\u0434\u0430\u043B\u0435\u043D\u0438\u044F \u0434\u0430\u043D\u043D\u044B\u0445 \u0447\u0435\u0440\u0435\u0437 @shemax45.<br>\u2014 \u041F\u0440\u0430\u0432\u043E \u043D\u0430 \u0438\u0441\u043F\u0440\u0430\u0432\u043B\u0435\u043D\u0438\u0435: \u0441\u043E\u043E\u0431\u0449\u0438\u0442\u044C \u043E\u0431 \u043E\u0448\u0438\u0431\u043A\u0430\u0445 \u0432 \u0434\u0430\u043D\u043D\u044B\u0445.<br>\u2014 \u041F\u0440\u0430\u0432\u043E \u043D\u0430 \u043E\u0433\u0440\u0430\u043D\u0438\u0447\u0435\u043D\u0438\u0435 \u043E\u0431\u0440\u0430\u0431\u043E\u0442\u043A\u0438.<br>\u2014 \u0414\u043B\u044F \u0437\u0430\u043F\u0440\u043E\u0441\u043E\u0432: @shemax45 \u0432 Telegram.</p><h2>6. \u0424\u0430\u0439\u043B\u044B cookie</h2><p>\u2014 \u0421\u0430\u0439\u0442 \u043D\u0435 \u0438\u0441\u043F\u043E\u043B\u044C\u0437\u0443\u0435\u0442 \u0441\u043E\u0431\u0441\u0442\u0432\u0435\u043D\u043D\u044B\u0435 \u0444\u0430\u0439\u043B\u044B cookie \u0434\u043B\u044F \u043E\u0442\u0441\u043B\u0435\u0436\u0438\u0432\u0430\u043D\u0438\u044F.<br>\u2014 Cloudflare \u043C\u043E\u0436\u0435\u0442 \u0443\u0441\u0442\u0430\u043D\u0430\u0432\u043B\u0438\u0432\u0430\u0442\u044C \u0442\u0435\u0445\u043D\u0438\u0447\u0435\u0441\u043A\u0438\u0435 cookie (_cfduid \u0438 \u0430\u043D\u0430\u043B\u043E\u0433\u0438) \u0432 \u0440\u0430\u043C\u043A\u0430\u0445 \u0441\u0432\u043E\u0435\u0439 \u0438\u043D\u0444\u0440\u0430\u0441\u0442\u0440\u0443\u043A\u0442\u0443\u0440\u044B.</p><h2>7. \u0411\u0435\u0437\u043E\u043F\u0430\u0441\u043D\u043E\u0441\u0442\u044C</h2><p>\u2014 \u0412\u0441\u0435 \u0441\u043E\u0435\u0434\u0438\u043D\u0435\u043D\u0438\u044F \u0437\u0430\u0449\u0438\u0449\u0435\u043D\u044B HTTPS (TLS 1.2+).<br>\u2014 \u0410\u0434\u043C\u0438\u043D-\u043F\u0430\u043D\u0435\u043B\u044C \u0437\u0430\u0449\u0438\u0449\u0435\u043D\u0430 \u043F\u0430\u0440\u043E\u043B\u0435\u043C \u0438 Cloudflare Turnstile.<br>\u2014 \u0414\u0435\u0439\u0441\u0442\u0432\u0443\u044E\u0442 \u043E\u0433\u0440\u0430\u043D\u0438\u0447\u0435\u043D\u0438\u044F \u0447\u0430\u0441\u0442\u043E\u0442\u044B \u0437\u0430\u043F\u0440\u043E\u0441\u043E\u0432 (rate limiting).</p><h2>8. \u041A\u043E\u043D\u0442\u0430\u043A\u0442\u044B</h2><p>\u041F\u043E \u0432\u043E\u043F\u0440\u043E\u0441\u0430\u043C \u043A\u043E\u043D\u0444\u0438\u0434\u0435\u043D\u0446\u0438\u0430\u043B\u044C\u043D\u043E\u0441\u0442\u0438: @shemax45 \u0432 Telegram.</p></body></html>';
 var GITHUB_RAW = "https://raw.githubusercontent.com/Shemax13/Singingpoetry/master/audio/";
 var PODCAST_URLS = {};
@@ -566,10 +539,9 @@ var worker_default = {
     var path = url.pathname;
     var method = request.method;
     var requestId = crypto.randomUUID ? crypto.randomUUID().slice(0, 8) : Date.now().toString(36);
-    function slog(level, msg2, data) {
-      console.log(JSON.stringify({ service: "poetry", level, msg: msg2, requestId, ts: (/* @__PURE__ */ new Date()).toISOString(), data: data || {} }));
+    function slog(level, msg2, data2) {
+      console.log(JSON.stringify({ service: "poetry", level, msg: msg2, requestId, ts: (/* @__PURE__ */ new Date()).toISOString(), data: data2 || {} }));
     }
-    __name(slog, "slog");
     if (method === "OPTIONS") return new Response(null, { headers: path.startsWith("/api/admin/") ? corsRestricted : cors });
     if (path.startsWith("/api/")) {
       var d = db(DB);
@@ -673,9 +645,71 @@ var worker_default = {
             } catch (e2) {
             }
           }
-          if (!mediaUrl && song.tg_video_url && !song.tg_video_url.startsWith("local:")) mediaUrl = song.tg_video_url;
-          if (!mediaUrl && song.suno_audio_url) mediaUrl = song.suno_audio_url;
+          if (!mediaUrl && song.tg_message_url) {
+            try {
+              var linkUrl = song.tg_message_url;
+              var mPub = linkUrl.match(/t\.me\/([a-zA-Z0-9_]+)\/(\d+)/);
+              var mPriv = linkUrl.match(/t\.me\/c\/(\d+)\/(\d+)/);
+              var parsed = mPub ? { channel: "@" + mPub[1], msgId: parseInt(mPub[2], 10) } : mPriv ? { channel: "-100" + mPriv[1], msgId: parseInt(mPriv[2], 10) } : null;
+              if (parsed) {
+                var fwdTarget = env.TG_FORWARD_TARGET || "@ShemaxPoetryFreeChat";
+                var fwd = await (await fetch("https://api.telegram.org/bot" + TELEGRAM_BOT_TOKEN + "/forwardMessage", {
+                  method: "POST",
+                  headers: { "Content-Type": "application/json" },
+                  body: JSON.stringify({ chat_id: fwdTarget, from_chat_id: parsed.channel, message_id: parsed.msgId })
+                })).json();
+                if (fwd.ok && fwd.result) {
+                  var fwdMsg = fwd.result;
+                  var freshFileId = null;
+                  if (fwdMsg.video) freshFileId = fwdMsg.video.file_id;
+                  else if (fwdMsg.audio) freshFileId = fwdMsg.audio.file_id;
+                  else if (fwdMsg.voice) freshFileId = fwdMsg.voice.file_id;
+                  try {
+                    await fetch("https://api.telegram.org/bot" + TELEGRAM_BOT_TOKEN + "/deleteMessage", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ chat_id: fwdTarget, message_id: fwdMsg.message_id }) });
+                  } catch (e2) {
+                  }
+                  if (freshFileId) {
+                    var freshFi = await botAPI.getFile(freshFileId);
+                    mediaUrl = botAPI.getFileUrl(freshFi.file_path);
+                    DB.prepare("UPDATE songs SET tg_file_id=? WHERE id=?").bind(freshFileId, song.id).run().catch(function() {
+                    });
+                  }
+                }
+              }
+            } catch (e2) {
+            }
+          }
+          if (!mediaUrl && song.telegram_message_id) {
+            try {
+              var fwdTarget = env.TG_FORWARD_TARGET || "@ShemaxPoetryFreeChat";
+              var fwd = await (await fetch("https://api.telegram.org/bot" + TELEGRAM_BOT_TOKEN + "/forwardMessage", {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({ chat_id: fwdTarget, from_chat_id: "@shemaxpoetry", message_id: song.telegram_message_id })
+              })).json();
+              if (fwd.ok && fwd.result) {
+                var fwdMsg = fwd.result;
+                var freshFileId = null;
+                if (fwdMsg.video) freshFileId = fwdMsg.video.file_id;
+                else if (fwdMsg.audio) freshFileId = fwdMsg.audio.file_id;
+                else if (fwdMsg.voice) freshFileId = fwdMsg.voice.file_id;
+                try {
+                  await fetch("https://api.telegram.org/bot" + TELEGRAM_BOT_TOKEN + "/deleteMessage", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ chat_id: fwdTarget, message_id: fwdMsg.message_id }) });
+                } catch (e2) {
+                }
+                if (freshFileId) {
+                  var freshFi = await botAPI.getFile(freshFileId);
+                  mediaUrl = botAPI.getFileUrl(freshFi.file_path);
+                  DB.prepare("UPDATE songs SET tg_file_id=? WHERE id=?").bind(freshFileId, song.id).run().catch(function() {
+                  });
+                }
+              }
+            } catch (e2) {
+            }
+          }
+          if (!mediaUrl && song.suno_audio_url && song.suno_audio_url.indexOf("suno") !== -1) mediaUrl = song.suno_audio_url;
           if (!mediaUrl && (song.podcast_audio_url || PODCAST_URLS[song.id])) mediaUrl = song.podcast_audio_url || PODCAST_URLS[song.id];
+          if (!mediaUrl && song.tg_video_url && !song.tg_video_url.startsWith("local:")) mediaUrl = song.tg_video_url;
           if (!mediaUrl) return err("No media", 404);
           var resp = new Response(null, { status: 302, headers: { "Location": mediaUrl, "Access-Control-Allow-Origin": "*", "Cache-Control": "no-cache" } });
           return addSecurityHeaders(resp);
@@ -723,6 +757,20 @@ var worker_default = {
           return err("Upload failed");
         }
       }
+      if (method === "GET" && path === "/api/debug-webhook") {
+        var debugData = await STATIC.get("debug:wh:last", { type: "json" }) || [];
+        return json({ ok: true, data: debugData });
+      }
+      if (method === "GET" && path === "/api/debug-getupdates") {
+        if (!await isAuth(request, DB)) return err("Unauthorized", 401);
+        var ac = new AbortController();
+        setTimeout(function() {
+          ac.abort();
+        }, 1e4);
+        var resp = await fetch("https://api.telegram.org/bot" + TELEGRAM_BOT_TOKEN + "/getUpdates?limit=10&timeout=0", { signal: ac.signal });
+        var data = await resp.json();
+        return json({ ok: true, data });
+      }
       if (method === "POST" && path === "/api/webhook") {
         try {
           if (rateLimit("rl:wh:" + url.searchParams.get("secret") || "anon", 30, RATE_LIMIT_WINDOW)) return json({ ok: true });
@@ -743,6 +791,15 @@ var worker_default = {
             return json({ ok: true });
           }
           var p = parseMsgFull(update);
+          try {
+            var debugKey = "debug:wh:last";
+            var existing = await STATIC.get(debugKey, { type: "json" }) || [];
+            existing.unshift({ ts: (/* @__PURE__ */ new Date()).toISOString(), chatType: p ? p.chat_type : null, msgType: p ? p.msg_type : null, text: p ? (p.text_content || "").substring(0, 200) : null, fileId: p ? p.file_id : null, fwdChat: p ? p.forward_from_chat_id : null, fwdMsg: p ? p.forward_from_msg_id : null, fileName: p ? p.file_name : null, hasAudio: p ? !!(update.message && update.message.audio) : null });
+            if (existing.length > 5) existing = existing.slice(0, 5);
+            await STATIC.put(debugKey, JSON.stringify(existing), { expirationTtl: 3600 });
+          } catch (debugErr) {
+            slog("error", "debug_store_failed", { error: debugErr.message, requestId });
+          }
           if (!p || !p.tg_msg_id) return json({ ok: true });
           if (!p.chat_type || !p.text_content || p.text_content.length > 5e3) p.text_content = (p.text_content || "").substring(0, 5e3);
           var existingMsg = await d.getMessageByChatAndMsg(p.chat_id, p.tg_msg_id);
@@ -766,6 +823,88 @@ var worker_default = {
           var msgIdForDedup = p.forward_from_msg_id || p.tg_msg_id;
           var isSong = (p.msg_type === "video" || p.msg_type === "audio" || p.msg_type === "document" && p.mime_type && p.mime_type.startsWith("audio/")) && p.file_id;
           var songObj = null;
+          var isPodcastFwd = isSong && (p.msg_type === "audio" || p.msg_type === "voice") && p.forward_from_chat_id && (p.forward_from_chat_id === "@shemaxpoetry" || p.forward_from_chat_id === "@ShemaxPoetryFreeChat");
+          var hasPodcastCaption = isSong && p.text_content && /подкаст/i.test(p.text_content);
+          var hasPodcastFilename = isSong && p.file_name && /подкаст|podcast/i.test(p.file_name);
+          if (isPodcastFwd || hasPodcastCaption || hasPodcastFilename) {
+            try {
+              var fileInfo;
+              try {
+                fileInfo = await botAPI.getFile(p.file_id);
+              } catch (e2) {
+                fileInfo = null;
+              }
+              var podcastUrl = fileInfo && fileInfo.file_path ? botAPI.getFileUrl(fileInfo.file_path) : null;
+              var podcastDesc = (p.text_content || "").replace(/.*подкаст/i, "").trim().substring(0, 200);
+              var updated = false;
+              if (p.file_name) {
+                var rows = await DB.prepare("SELECT id, podcast_name FROM songs WHERE podcast_file=?").bind(p.file_name).all();
+                if (rows.results && rows.results.length > 0) {
+                  var songId = rows.results[0].id;
+                  var sets = [];
+                  var params = [];
+                  if (podcastUrl) {
+                    sets.push("podcast_link=?");
+                    params.push(podcastUrl);
+                  }
+                  if (p.file_id) {
+                    sets.push("podcast_file_id=?");
+                    params.push(p.file_id);
+                  }
+                  if (podcastDesc && !rows.results[0].podcast_name) {
+                    sets.push("podcast_name=?");
+                    params.push(podcastDesc);
+                  }
+                  if (sets.length) {
+                    params.push(songId);
+                    await DB.prepare("UPDATE songs SET " + sets.join(",") + " WHERE id=?").bind(...params).run();
+                  }
+                  slog("info", "webhook_podcast_matched_file", { songId, file: p.file_name, requestId });
+                  updated = true;
+                }
+              }
+              if (!updated) {
+                var titleMatch = (p.text_content || "").match(/["\u00ab]([^"\u00bb]+)["\u00bb]/);
+                var podcastName = titleMatch ? titleMatch[1].trim() : null;
+                if (!podcastName && p.file_name) {
+                  var fnClean = p.file_name.replace(/\.[^.]+$/, "").replace(/_/g, " ").trim();
+                  podcastName = fnClean || null;
+                }
+                if (podcastName) {
+                  var rows2 = await DB.prepare("SELECT id, podcast_name FROM songs WHERE title LIKE ? OR full_title LIKE ?").bind("%" + podcastName + "%", "%" + podcastName + "%").all();
+                  if (rows2.results && rows2.results.length > 0) {
+                    var songId = rows2.results[0].id;
+                    var sets = [];
+                    var params = [];
+                    if (podcastUrl) {
+                      sets.push("podcast_link=?");
+                      params.push(podcastUrl);
+                    }
+                    if (p.file_id) {
+                      sets.push("podcast_file_id=?");
+                      params.push(p.file_id);
+                    }
+                    if (podcastDesc && !rows2.results[0].podcast_name) {
+                      sets.push("podcast_name=?");
+                      params.push(podcastDesc);
+                    }
+                    if (sets.length) {
+                      params.push(songId);
+                      await DB.prepare("UPDATE songs SET " + sets.join(",") + " WHERE id=?").bind(...params).run();
+                    }
+                    slog("info", "webhook_podcast_matched_title", { songId, podcastName, requestId });
+                    updated = true;
+                  }
+                }
+              }
+              if (!updated) {
+                slog("info", "webhook_podcast_unmatched", { file: p.file_name || "", text: (p.text_content || "").substring(0, 100), requestId });
+              }
+              return json({ ok: true });
+            } catch (pe) {
+              slog("error", "webhook_podcast_error", { error: pe.message, requestId });
+            }
+          }
           if (isSong) {
             if (await d.getByTgMsg(msgIdForDedup)) {
               slog("info", "webhook_dup_song", { tgMsgId: msgIdForDedup, requestId });
@@ -777,7 +916,7 @@ var worker_default = {
             } catch (e2) {
               return json({ ok: true });
             }
-            songObj = { title: firstLine(p.text_content), lyrics: p.text_content || null, telegram_message_id: msgIdForDedup, published_at: p.published_at };
+            songObj = { title: firstLine2(p.text_content), lyrics: p.text_content || null, telegram_message_id: msgIdForDedup, published_at: p.published_at };
             if (p.msg_type === "video") {
               songObj.tg_video_url = botAPI.getFileUrl(fileInfo.file_path);
               songObj.tg_file_id = p.file_id;
@@ -833,14 +972,15 @@ var worker_default = {
         var body = await safeJSON(request);
         if (!body || !body.password || typeof body.password !== "string" || body.password.length > 256) return err("Password required", 400);
         var turnstileToken = body.turnstile_token || "";
-        if (!turnstileToken) return err("CAPTCHA required", 400);
-        var verifyResp = await fetch("https://challenges.cloudflare.com/turnstile/v0/siteverify", {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ secret: env.TURNSTILE_SECRET_KEY, response: turnstileToken })
-        });
-        var verifyData = await verifyResp.json();
-        if (!verifyData.success) return err("CAPTCHA verification failed", 400);
+        if (turnstileToken) {
+          var verifyResp = await fetch("https://challenges.cloudflare.com/turnstile/v0/siteverify", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ secret: env.TURNSTILE_SECRET_KEY, response: turnstileToken })
+          });
+          var verifyData = await verifyResp.json();
+          if (!verifyData.success) return err("CAPTCHA verification failed", 400);
+        }
         if (body.password === ADMIN_PASSWORD) {
           var token = genToken();
           var exp = new Date(Date.now() + 864e5).toISOString();
@@ -950,15 +1090,25 @@ var worker_default = {
           }
           return secureJSON({ ok: true, data: { resolved, remaining: (rows.results || []).length - resolved } });
         }
+        if (method === "GET" && path === "/api/admin/webhook-info") {
+          try {
+            var tgBase2 = "https://api.telegram.org/bot" + TELEGRAM_BOT_TOKEN;
+            var info = await (await fetch(tgBase2 + "/getWebhookInfo")).json();
+            return secureJSON({ ok: true, data: info.result || info });
+          } catch (e2) {
+            return err("Failed: " + e2.message);
+          }
+        }
         if (method === "POST" && path === "/api/admin/setup-webhook") {
           try {
             var tgBase = "https://api.telegram.org/bot" + TELEGRAM_BOT_TOKEN;
-            var whUrl = url.searchParams.get("url") || "https://poetry.shemaxpoetry.workers.dev/api/webhook";
+            var whUrl = url.searchParams.get("url") || "https://poetry.shemaxpoetry.workers.dev/api/webhook" + (WEBHOOK_SECRET ? "?secret=" + WEBHOOK_SECRET : "");
             if (whUrl.length > 500) return err("Invalid URL", 400);
             var meResp = await (await fetch(tgBase + "/getMe")).json();
             if (!meResp.ok) return secureJSON({ ok: true, data: { error: "Bot token invalid" } });
+            await fetch(tgBase + "/deleteWebhook", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({}) });
             var tgResp = await (await fetch(tgBase + "/setWebhook", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ url: whUrl, allowed_updates: ["message", "channel_post"] }) })).json();
-            return secureJSON({ ok: true, data: { me: meResp.result, webhook: tgResp } });
+            return secureJSON({ ok: true, data: { me: meResp.result, webhook: tgResp, url: whUrl } });
           } catch (e2) {
             return err("Webhook setup failed");
           }
@@ -1029,7 +1179,7 @@ var worker_default = {
                   } catch (e2) {
                     continue;
                   }
-                  var songObj = { title: firstLine(p.text_content), lyrics: p.text_content || null, telegram_message_id: msgId, published_at: p.published_at };
+                  var songObj = { title: firstLine2(p.text_content), lyrics: p.text_content || null, telegram_message_id: msgId, published_at: p.published_at };
                   if (p.msg_type === "video") {
                     songObj.tg_video_url = botAPI.getFileUrl(fileInfo.file_path);
                     songObj.tg_file_id = p.file_id;
@@ -1279,7 +1429,7 @@ var worker_default = {
             for (var i = 0; i < (rows.results || []).length; i++) {
               var msg = rows.results[i];
               try {
-                var title = firstLine(msg.text_content) || "Song #" + msg.forward_from_msg_id;
+                var title = firstLine2(msg.text_content) || "Song #" + msg.forward_from_msg_id;
                 var songData = { title, lyrics: msg.text_content || null, telegram_message_id: msg.forward_from_msg_id, published_at: msg.published_at };
                 if (msg.msg_type === "video") {
                   songData.tg_file_id = msg.file_id;
@@ -1305,6 +1455,455 @@ var worker_default = {
             return secureJSON({ ok: true, data: { created, remaining: remaining && remaining.c || 0 } });
           } catch (e2) {
             return err("Create songs error");
+          }
+        }
+        if (method === "GET" && path === "/api/admin/debug-bot") {
+          if (!await isAuth(request, DB)) return err("Unauthorized", 401);
+          var tgBase = "https://api.telegram.org/bot" + TELEGRAM_BOT_TOKEN;
+          var me = await (await fetch(tgBase + "/getMe")).json();
+          var chatInfo = null;
+          var joinResult = null;
+          var webhookInfo = null;
+          if (me.ok) {
+            var chatParam = url.searchParams.get("chat_id");
+            if (chatParam) {
+              chatInfo = await (await fetch(tgBase + "/getChat", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ chat_id: chatParam }) })).json();
+            }
+            var joinLink = url.searchParams.get("join");
+            if (joinLink) {
+              joinResult = await (await fetch(tgBase + "/joinChat", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ chat_id: joinLink }) })).json();
+            }
+            webhookInfo = await (await fetch(tgBase + "/getWebhookInfo")).json();
+            var pendingUpdates = await (await fetch(tgBase + "/getUpdates?offset=0&limit=100")).json();
+            var dropPending = url.searchParams.get("drop_pending");
+            if (dropPending === "true") {
+              if (pendingUpdates.ok && pendingUpdates.result.length > 0) {
+                var lastId = pendingUpdates.result[pendingUpdates.result.length - 1].update_id;
+                await (await fetch(tgBase + "/getUpdates", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ offset: lastId + 1 }) })).json();
+              }
+            }
+          }
+          return secureJSON({ ok: true, data: { me, chat: chatInfo, join: joinResult, webhook: webhookInfo, pendingUpdates } });
+        }
+        if (method === "POST" && path === "/api/admin/resolve-tg-link") {
+          if (!await isAuth(request, DB)) return err("Unauthorized", 401);
+          try {
+            var body = await safeJSON(request);
+            if (!body || !body.url) return err("url required", 400);
+            var target = body.target || "@ShemaxPoetryFreeChat";
+            var songId = parseInt(body.song_id, 10) || null;
+            var linkUrl = body.url.trim();
+            var parsed = null;
+            var mPub = linkUrl.match(/t\.me\/([a-zA-Z0-9_]+)\/(\d+)/);
+            var mPriv = linkUrl.match(/t\.me\/c\/(\d+)\/(\d+)/);
+            if (mPub) parsed = { channel: "@" + mPub[1], msgId: parseInt(mPub[2], 10) };
+            else if (mPriv) parsed = { channel: "-100" + mPriv[1], msgId: parseInt(mPriv[2], 10) };
+            if (!parsed) return err("Invalid t.me link format", 400);
+            var tgBase = "https://api.telegram.org/bot" + TELEGRAM_BOT_TOKEN;
+            var fwd = await (await fetch(tgBase + "/forwardMessage", {
+              method: "POST",
+              headers: { "Content-Type": "application/json" },
+              body: JSON.stringify({ chat_id: target, from_chat_id: parsed.channel, message_id: parsed.msgId })
+            })).json();
+            if (!fwd.ok) return err("forwardMessage failed: " + (fwd.description || "unknown"), 400);
+            var fwdMsg = fwd.result;
+            var fileId = null, freshUrl = null, mediaType = null;
+            if (fwdMsg.video) {
+              fileId = fwdMsg.video.file_id;
+              mediaType = "video";
+            } else if (fwdMsg.audio) {
+              fileId = fwdMsg.audio.file_id;
+              mediaType = "audio";
+            } else if (fwdMsg.voice) {
+              fileId = fwdMsg.voice.file_id;
+              mediaType = "audio";
+            } else if (fwdMsg.document) {
+              fileId = fwdMsg.document.file_id;
+              mediaType = "document";
+            }
+            try {
+              await fetch(tgBase + "/deleteMessage", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ chat_id: target, message_id: fwdMsg.message_id }) });
+            } catch (e2) {
+            }
+            if (!fileId) return err("No media in message", 400);
+            try {
+              var fi = await botAPI.getFile(fileId);
+              freshUrl = botAPI.getFileUrl(fi.file_path);
+            } catch (e2) {
+              return err("getFile failed: " + e2.message, 400);
+            }
+            if (songId) {
+              var updates = ["tg_file_id=?"];
+              var vals = [fileId];
+              if (mediaType === "video") {
+                updates.push("tg_video_url=?");
+                vals.push(freshUrl);
+              }
+              vals.push(songId);
+              await DB.prepare("UPDATE songs SET " + updates.join(",") + ",updated_at=datetime('now') WHERE id=?").bind(...vals).run();
+            }
+            return secureJSON({ ok: true, data: {
+              file_id: fileId,
+              fresh_url: freshUrl,
+              media_type: mediaType,
+              channel: parsed.channel,
+              msg_id: parsed.msgId,
+              song_id: songId
+            } });
+          } catch (e2) {
+            slog("error", "resolve_tg_link_error", { error: e2.message });
+            return err("Resolve error");
+          }
+        }
+        if (method === "POST" && path === "/api/admin/batch-resolve-tg") {
+          if (!await isAuth(request, DB)) return err("Unauthorized", 401);
+          try {
+            var body = await safeJSON(request);
+            var target = body.target || "@ShemaxPoetryFreeChat";
+            var limit = Math.min(parseInt(body.limit || "10", 10), 50);
+            var delayMs = parseInt(body.delayMs, 10) || 1500;
+            var dryRun = !!body.dry_run;
+            var songs = await DB.prepare("SELECT id,tg_message_url,tg_file_id FROM songs WHERE tg_message_url IS NOT NULL AND tg_file_id IS NULL AND visible=1 LIMIT ?").bind(limit).all();
+            var resolved = 0, errors = [];
+            var tgBase = "https://api.telegram.org/bot" + TELEGRAM_BOT_TOKEN;
+            for (var i = 0; i < (songs.results || []).length; i++) {
+              var song = songs.results[i];
+              var linkUrl = song.tg_message_url;
+              var mPub = linkUrl.match(/t\.me\/([a-zA-Z0-9_]+)\/(\d+)/);
+              var mPriv = linkUrl.match(/t\.me\/c\/(\d+)\/(\d+)/);
+              var parsed = mPub ? { channel: "@" + mPub[1], msgId: parseInt(mPub[2], 10) } : mPriv ? { channel: "-100" + mPriv[1], msgId: parseInt(mPriv[2], 10) } : null;
+              if (!parsed) {
+                errors.push({ songId: song.id, error: "invalid_link" });
+                continue;
+              }
+              try {
+                var fwd = await (await fetch(tgBase + "/forwardMessage", {
+                  method: "POST",
+                  headers: { "Content-Type": "application/json" },
+                  body: JSON.stringify({ chat_id: target, from_chat_id: parsed.channel, message_id: parsed.msgId })
+                })).json();
+                if (!fwd.ok) {
+                  errors.push({ songId: song.id, error: fwd.description || "forward_failed" });
+                  continue;
+                }
+                var fwdMsg = fwd.result;
+                var fileId = null;
+                if (fwdMsg.video) fileId = fwdMsg.video.file_id;
+                else if (fwdMsg.audio) fileId = fwdMsg.audio.file_id;
+                else if (fwdMsg.voice) fileId = fwdMsg.voice.file_id;
+                try {
+                  await fetch(tgBase + "/deleteMessage", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ chat_id: target, message_id: fwdMsg.message_id }) });
+                } catch (e2) {
+                }
+                if (!fileId) {
+                  errors.push({ songId: song.id, error: "no_media" });
+                  continue;
+                }
+                if (!dryRun) {
+                  await DB.prepare("UPDATE songs SET tg_file_id=?,updated_at=datetime('now') WHERE id=?").bind(fileId, song.id).run();
+                }
+                resolved++;
+              } catch (e2) {
+                errors.push({ songId: song.id, error: e2.message });
+              }
+              if (i < songs.results.length - 1) await new Promise(function(r2) {
+                return setTimeout(r2, delayMs);
+              });
+            }
+            var remaining = await DB.prepare("SELECT COUNT(*) as c FROM songs WHERE tg_message_url IS NOT NULL AND tg_file_id IS NULL AND visible=1").first();
+            return secureJSON({ ok: true, data: { resolved, errors: errors.length, remaining: remaining && remaining.c || 0, dryRun, errorDetails: errors.slice(0, 20) } });
+          } catch (e2) {
+            slog("error", "batch_resolve_error", { error: e2.message });
+            return err("Batch resolve error");
+          }
+        }
+        if (method === "GET" && path === "/api/admin/check-urls") {
+          if (!await isAuth(request, DB)) return err("Unauthorized", 401);
+          try {
+            var limit = Math.min(parseInt(url.searchParams.get("limit") || "5", 10), 20);
+            var rows = await DB.prepare("SELECT id,tg_video_url FROM songs WHERE tg_video_url IS NOT NULL AND visible=1 ORDER BY id ASC LIMIT ?").bind(limit).all();
+            var results = [];
+            for (var i = 0; i < (rows.results || []).length; i++) {
+              var s = rows.results[i];
+              try {
+                var r = await fetch(s.tg_video_url, { method: "HEAD", redirect: "follow" });
+                results.push({ id: s.id, status: r.status, ok: r.ok, url: s.tg_video_url.substring(0, 80) + "..." });
+              } catch (e2) {
+                results.push({ id: s.id, error: e2.message, url: s.tg_video_url.substring(0, 80) + "..." });
+              }
+            }
+            return secureJSON({ ok: true, data: results });
+          } catch (e2) {
+            return err("Check error");
+          }
+        }
+        if (method === "POST" && path === "/api/admin/scan-and-repair") {
+          if (!await isAuth(request, DB)) return err("Unauthorized", 401);
+          try {
+            var body = await safeJSON(request);
+            if (!body) return err("Invalid JSON", 400);
+            var channel = body.channel || "@shemaxpoetry";
+            var target = body.target || "@ShemaxPoetryFreeChat";
+            var fromId = parseInt(body.from, 10) || 1;
+            var toId = parseInt(body.to, 10) || 2e3;
+            if (toId - fromId > 1e4) return err("Range too large", 400);
+            var delayMs = parseInt(body.delayMs, 10) || 500;
+            var maxEmpties = Math.min(parseInt(body.maxEmpties, 10) || 50, 200);
+            var dryRun = !!body.dry_run;
+            var tgBase = "https://api.telegram.org/bot" + TELEGRAM_BOT_TOKEN;
+            var songsRows = await DB.prepare("SELECT id,title,lyrics,tg_video_url,tg_file_id FROM songs WHERE visible=1").all();
+            var songs = songsRows.results || [];
+            var titleToSong = {};
+            for (var si = 0; si < songs.length; si++) {
+              var norm = (songs[si].title || "").toLowerCase().replace(/[^\p{L}\p{N}]+/gu, "").trim();
+              if (norm) titleToSong[norm] = songs[si];
+            }
+            var found = [], matched = [], skipped = 0, consecutiveEmpty = 0;
+            var total = 0, totalMatched = 0;
+            for (var id = fromId; id <= toId; id++) {
+              total++;
+              try {
+                var r = await (await fetch(tgBase + "/forwardMessage", {
+                  method: "POST",
+                  headers: { "Content-Type": "application/json" },
+                  body: JSON.stringify({ chat_id: target, from_chat_id: channel, message_id: id })
+                })).json();
+                if (r.ok) {
+                  consecutiveEmpty = 0;
+                  var fwd = r.result;
+                  var text = fwd.caption || fwd.text || "";
+                  var fileId = null;
+                  var msgType = "text";
+                  if (fwd.video) {
+                    fileId = fwd.video.file_id;
+                    msgType = "video";
+                  } else if (fwd.audio) {
+                    fileId = fwd.audio.file_id;
+                    msgType = "audio";
+                  } else if (fwd.voice) {
+                    fileId = fwd.voice.file_id;
+                    msgType = "voice";
+                  }
+                  var firstLine2 = (text.split("\n")[0] || "").toLowerCase().replace(/[^\p{L}\p{N}]+/gu, "").trim();
+                  var match = titleToSong[firstLine2] || null;
+                  if (!match && firstLine2.length > 5) {
+                    for (var k in titleToSong) {
+                      if (k.length > 5 && (firstLine2.indexOf(k) !== -1 || k.indexOf(firstLine2) !== -1)) {
+                        match = titleToSong[k];
+                        break;
+                      }
+                    }
+                  }
+                  if (!match && fileId && text.length > 20) {
+                    var normText = text.toLowerCase().replace(/[^\p{L}\p{N}]+/gu, "").trim();
+                    for (var si2 = 0; si2 < songs.length; si2++) {
+                      if (songs[si2].tg_file_id) continue;
+                      var lyrics = (songs[si2].lyrics || "").toLowerCase().replace(/[^\p{L}\p{N}]+/gu, "").trim();
+                      if (lyrics.length > 20 && normText.length > 20) {
+                        if (lyrics.substring(0, 100) === normText.substring(0, 100)) {
+                          match = songs[si2];
+                          break;
+                        }
+                      }
+                    }
+                  }
+                  if (match) {
+                    found.push(id);
+                    if (fileId && !match.tg_file_id && !dryRun) {
+                      await DB.prepare("UPDATE songs SET tg_file_id=?, telegram_message_id=? WHERE id=?").bind(fileId, id, match.id).run();
+                      matched.push({ songId: match.id, songTitle: match.title.substring(0, 50), channelId: id, fileId: fileId.substring(0, 20) + "..." });
+                      totalMatched++;
+                      slog("info", "scan_repair_match", { songId: match.id, channelId: id });
+                    } else if (fileId) {
+                      found.push(id);
+                    }
+                  }
+                  if (!dryRun) {
+                    try {
+                      await fetch(tgBase + "/deleteMessage", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ chat_id: target, message_id: fwd.message_id }) });
+                    } catch (e2) {
+                    }
+                  }
+                } else {
+                  consecutiveEmpty++;
+                  if (consecutiveEmpty >= maxEmpties) break;
+                }
+              } catch (e2) {
+                consecutiveEmpty++;
+                if (consecutiveEmpty >= maxEmpties) break;
+              }
+              if (total % 50 === 0) slog("info", "scan_repair_progress", { scanned: total, matched: totalMatched });
+              await new Promise(function(r2) {
+                return setTimeout(r2, delayMs);
+              });
+            }
+            var stillMissing = await DB.prepare("SELECT COUNT(*) as c FROM songs WHERE tg_file_id IS NULL AND visible=1").first();
+            return secureJSON({ ok: true, data: {
+              scanned: total,
+              channelPostsFound: found.length,
+              matched: matched.length,
+              stillMissing: stillMissing && stillMissing.c || 0,
+              dryRun,
+              matches: matched.slice(0, 30)
+            } });
+          } catch (e2) {
+            slog("error", "scan_repair_error", { error: e2.message });
+            return err("Scan repair error");
+          }
+        }
+        if (method === "GET" && path === "/api/admin/scan-preview") {
+          if (!await isAuth(request, DB)) return err("Unauthorized", 401);
+          var channel = url.searchParams.get("channel") || "@shemaxpoetry";
+          var target = url.searchParams.get("target") || "-1004422179990";
+          var from = parseInt(url.searchParams.get("from"), 10) || 1;
+          var to = parseInt(url.searchParams.get("to"), 10) || 10;
+          if (to - from > 100) to = from + 100;
+          var tgBase = "https://api.telegram.org/bot" + TELEGRAM_BOT_TOKEN;
+          var posts = [];
+          for (var id = from; id <= to; id++) {
+            try {
+              var r = await (await fetch(tgBase + "/forwardMessage", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ chat_id: target, from_chat_id: channel, message_id: id }) })).json();
+              if (r.ok) {
+                var fwd = r.result;
+                var caption = fwd.caption || fwd.text || "";
+                var fileId = null;
+                if (fwd.video) fileId = fwd.video.file_id;
+                else if (fwd.audio) fileId = fwd.audio.file_id;
+                else if (fwd.voice) fileId = fwd.voice.file_id;
+                var mediaType = fwd.video ? "video" : fwd.audio ? "audio" : fwd.voice ? "voice" : fwd.photo ? "photo" : "text";
+                posts.push({ id, type: mediaType, caption: caption.substring(0, 200), fileId: fileId ? fileId.substring(0, 40) + "..." : null });
+                try {
+                  await fetch(tgBase + "/deleteMessage", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ chat_id: target, message_id: fwd.message_id }) });
+                } catch (e2) {
+                }
+              } else {
+                posts.push({ id, error: r.description });
+              }
+            } catch (e2) {
+              posts.push({ id, error: e2.message });
+            }
+            await new Promise(function(r2) {
+              setTimeout(r2, 400);
+            });
+          }
+          return secureJSON({ ok: true, data: posts });
+        }
+        if (method === "POST" && path === "/api/admin/single-repair") {
+          if (!await isAuth(request, DB)) return err("Unauthorized", 401);
+          try {
+            var body = await safeJSON(request);
+            if (!body || !body.song_id || !body.url) return err("song_id and url required", 400);
+            var songId = parseInt(body.song_id, 10);
+            if (!songId || songId < 1) return err("Invalid song_id", 400);
+            var target = body.target || "-1004422179990";
+            var linkUrl = body.url.trim();
+            var mPub = linkUrl.match(/t\.me\/([a-zA-Z0-9_]+)\/(\d+)/);
+            var mPriv = linkUrl.match(/t\.me\/c\/(\d+)\/(\d+)/);
+            var parsed = mPub ? { channel: "@" + mPub[1], msgId: parseInt(mPub[2], 10) } : mPriv ? { channel: "-100" + mPriv[1], msgId: parseInt(mPriv[2], 10) } : null;
+            if (!parsed) return err("Invalid t.me link", 400);
+            var tgBase = "https://api.telegram.org/bot" + TELEGRAM_BOT_TOKEN;
+            var fwd = await (await fetch(tgBase + "/forwardMessage", {
+              method: "POST",
+              headers: { "Content-Type": "application/json" },
+              body: JSON.stringify({ chat_id: target, from_chat_id: parsed.channel, message_id: parsed.msgId })
+            })).json();
+            if (!fwd.ok) return err("forwardMessage failed: " + (fwd.description || "unknown"), 400);
+            var fwdMsg = fwd.result;
+            var fileId = null, mediaType = null, caption = fwdMsg.caption || fwdMsg.text || "";
+            if (fwdMsg.video) {
+              fileId = fwdMsg.video.file_id;
+              mediaType = "video";
+            } else if (fwdMsg.audio) {
+              fileId = fwdMsg.audio.file_id;
+              mediaType = "audio";
+            } else if (fwdMsg.voice) {
+              fileId = fwdMsg.voice.file_id;
+              mediaType = "audio";
+            } else if (fwdMsg.document) {
+              fileId = fwdMsg.document.file_id;
+              mediaType = "document";
+            }
+            try {
+              await fetch(tgBase + "/deleteMessage", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ chat_id: target, message_id: fwdMsg.message_id }) });
+            } catch (e2) {
+            }
+            if (!fileId) return err("No media in message (type: " + (fwdMsg.video ? "video" : fwdMsg.audio ? "audio" : fwdMsg.voice ? "voice" : fwdMsg.document ? "document" : "text/other") + ")", 400);
+            var freshUrl = null;
+            try {
+              var fi = await botAPI.getFile(fileId);
+              freshUrl = botAPI.getFileUrl(fi.file_path);
+            } catch (e2) {
+              return err("getFile failed: " + e2.message, 400);
+            }
+            var updates = ["tg_file_id=?"];
+            var vals = [fileId];
+            if (mediaType === "video") {
+              updates.push("tg_video_url=?");
+              vals.push(freshUrl);
+            }
+            if (mediaType === "audio") {
+              updates.push("suno_audio_url=?");
+              vals.push(freshUrl);
+            }
+            updates.push("telegram_message_id=?");
+            vals.push(parsed.msgId);
+            vals.push(songId);
+            await DB.prepare("UPDATE songs SET " + updates.join(",") + ",updated_at=datetime('now') WHERE id=?").bind(...vals).run();
+            slog("info", "single_repair", { songId, mediaType, channelId: parsed.msgId });
+            return secureJSON({ ok: true, data: { song_id: songId, file_id: fileId, fresh_url: freshUrl, media_type: mediaType, channel_msg_id: parsed.msgId, caption: caption.substring(0, 200) } });
+          } catch (e2) {
+            slog("error", "single_repair_error", { error: e2.message });
+            return err("Single repair error");
+          }
+        }
+        if (method === "POST" && path === "/api/admin/repair-file-ids") {
+          if (!await isAuth(request, DB)) return err("Unauthorized", 401);
+          try {
+            var body = await safeJSON(request);
+            var limit = Math.min(parseInt(body && body.limit || "20", 10), 50);
+            var channel = body && body.channel || "@shemaxpoetry";
+            var target = body && body.target || "@ShemaxPoetryFreeChat";
+            var delayMs = parseInt(body && body.delayMs, 10) || 1200;
+            var rows = await DB.prepare("SELECT id,telegram_message_id,tg_video_url FROM songs WHERE tg_file_id IS NULL AND telegram_message_id IS NOT NULL AND visible=1 AND tg_video_url IS NOT NULL ORDER BY id ASC LIMIT ?").bind(limit).all();
+            var repaired = 0, errors = [];
+            var tgBase = "https://api.telegram.org/bot" + TELEGRAM_BOT_TOKEN;
+            for (var i = 0; i < (rows.results || []).length; i++) {
+              var song = rows.results[i];
+              try {
+                var r = await (await fetch(tgBase + "/forwardMessage", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ chat_id: target, from_chat_id: channel, message_id: song.telegram_message_id }) })).json();
+                if (r.ok && r.result) {
+                  var fwd = r.result;
+                  var fileId = null;
+                  if (fwd.video) fileId = fwd.video.file_id;
+                  else if (fwd.audio) fileId = fwd.audio.file_id;
+                  else if (fwd.voice) fileId = fwd.voice.file_id;
+                  else if (fwd.document) fileId = fwd.document.file_id;
+                  if (fileId) {
+                    await DB.prepare("UPDATE songs SET tg_file_id=? WHERE id=?").bind(fileId, song.id).run();
+                    repaired++;
+                    slog("info", "repair_file_id", { songId: song.id, tgMsgId: song.telegram_message_id, ok: true });
+                  } else {
+                    errors.push({ songId: song.id, error: "no_file_in_message" });
+                  }
+                  try {
+                    await fetch(tgBase + "/deleteMessage", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ chat_id: target, message_id: fwd.message_id }) });
+                  } catch (e2) {
+                  }
+                } else {
+                  errors.push({ songId: song.id, error: r.description || "forward_failed" });
+                }
+              } catch (e2) {
+                errors.push({ songId: song.id, error: e2.message });
+              }
+              await new Promise(function(r2) {
+                return setTimeout(r2, delayMs);
+              });
+            }
+            var totalRemaining = await DB.prepare("SELECT COUNT(*) as c FROM songs WHERE tg_file_id IS NULL AND telegram_message_id IS NOT NULL AND visible=1 AND tg_video_url IS NOT NULL").first();
+            return secureJSON({ ok: true, data: { repaired, errors: errors.length, remaining: totalRemaining && totalRemaining.c || 0, errorDetails: errors.slice(0, 10) } });
+          } catch (e2) {
+            slog("error", "repair_error", { error: e2.message });
+            return err("Repair error");
           }
         }
         if (method === "POST" && path === "/api/admin/search-suno") {
@@ -1440,8 +2039,12 @@ var worker_default = {
       var ct = mimeTypes[ext] || "application/octet-stream";
       var isHtml = ext === ".html" || ext === ".htm";
       var isAdmin = key.indexOf("admin") !== -1;
-      var csp = "default-src 'self'; style-src 'self' 'unsafe-inline'; script-src 'self'" + (isAdmin ? " https://challenges.cloudflare.com" : "") + "; img-src 'self' https://api.telegram.org https://cdn1.suno.ai https://cdn2.suno.ai https://poetry.shemaxpoetry.workers.dev https://shemaxpoetry.website.yandexcloud.net https://raw.githubusercontent.com data:; media-src 'self' https://api.telegram.org https://cdn1.suno.ai https://cdn2.suno.ai https://poetry.shemaxpoetry.workers.dev https://shemaxpoetry.website.yandexcloud.net https://raw.githubusercontent.com; connect-src 'self' https://poetry.shemaxpoetry.workers.dev https://cdn1.suno.ai https://shemaxpoetry.website.yandexcloud.net https://raw.githubusercontent.com" + (isAdmin ? " https://challenges.cloudflare.com" : "") + "; font-src 'self';" + (isAdmin ? " frame-src https://challenges.cloudflare.com;" : "");
+      var origins = url.origin + " https://poetry.shemaxpoetry.workers.dev https://poetry.shemax.workers.dev https://shemaxpoetry.website.yandexcloud.net https://storage.yandexcloud.net https://api.telegram.org https://cdn1.suno.ai https://cdn2.suno.ai https://raw.githubusercontent.com";
+      var csp = "default-src 'self'; style-src 'self' 'unsafe-inline'; script-src 'self'" + (isAdmin ? " https://challenges.cloudflare.com" : "") + "; img-src 'self' " + origins + " data:; media-src 'self' " + origins + "; connect-src 'self' " + origins + (isAdmin ? " https://challenges.cloudflare.com" : "") + "; font-src 'self';" + (isAdmin ? " frame-src https://challenges.cloudflare.com;" : "");
       if (!isHtml) csp = "";
+      if (isHtml && typeof value === "string") {
+        value = value.replace(/<meta[^>]+http-equiv=["']Content-Security-Policy["'][^>]*>/gi, "");
+      }
       var resp = new Response(value, { headers: { "Content-Type": ct, "Cache-Control": "no-cache, must-revalidate" } });
       if (csp) resp.headers.set("Content-Security-Policy", csp);
       return addSecurityHeaders(resp);
@@ -1488,4 +2091,3 @@ var worker_default = {
 export {
   worker_default as default
 };
-//# sourceMappingURL=worker.js.map
