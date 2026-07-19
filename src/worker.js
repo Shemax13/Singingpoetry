@@ -1372,6 +1372,9 @@ export default {
         "; font-src 'self';" +
         (isAdmin ? " frame-src https://challenges.cloudflare.com;" : "");
       if (!isHtml) csp = "";
+      if (isHtml && typeof value === "string") {
+        value = value.replace(/<meta[^>]+http-equiv=["']Content-Security-Policy["'][^>]*>/gi, "");
+      }
       var resp = new Response(value, { headers: { "Content-Type": ct, "Cache-Control": "no-cache, must-revalidate" } });
       if (csp) resp.headers.set("Content-Security-Policy", csp);
       return addSecurityHeaders(resp);
